@@ -1,0 +1,45 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  default:
+    format: '%(asctime)s - %(name)s - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  data_loader:
+    format: '%(asctime)s - DATA_LOADER - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  model_trainer:
+    format: '%(asctime)s - MODEL_TRAINER - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  data_loader_file:
+    class: logging.FileHandler
+    formatter: data_loader
+    filename: logs/data_loader/data_loader.log
+    level: DEBUG
+    encoding: utf-8
+  model_trainer_file:
+    class: logging.FileHandler
+    formatter: model_trainer
+    filename: logs/model_trainer/model_trainer.log
+    level: DEBUG
+    encoding: utf-8
+  console:
+    class: logging.StreamHandler
+    formatter: default
+    level: INFO
+
+loggers:
+  data_loader_logger:
+    level: DEBUG
+    handlers: [data_loader_file, console]
+    propagate: false
+  model_trainer_logger:
+    level: DEBUG
+    handlers: [model_trainer_file, console]
+    propagate: false
+
+root:
+  level: INFO
+  handlers: [console]
