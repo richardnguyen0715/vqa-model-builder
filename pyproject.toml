@@ -6,12 +6,15 @@ authors = [
     {name = "tuong.nguyen",email = "richardnguyen0715@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11, <4.0"
 dependencies = [
-    "numpy (>=2.3.4,<3.0.0)",
-    "pandas (>=2.3.3,<3.0.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
-    "kagglehub (>=0.3.13,<0.4.0)"
+    "kagglehub (>=0.3.13,<0.4.0)",
+    "opencv-python (>=4.12.0.88,<5.0.0.0)",
+    "pandas (>=2.3.3,<3.0.0)",
+    "matplotlib (>=3.10.7,<4.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "pydantic (>=2.12.4,<3.0.0)"
 ]
 
 

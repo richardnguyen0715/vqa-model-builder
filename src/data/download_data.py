@@ -2,7 +2,7 @@ import kagglehub
 import shutil
 from pathlib import Path
 from src.middleware.logger import data_loader_logger
-from utils.config_loader import load_config
+from src.middleware.config import data_config
 
 
 def download_and_organize_data():
@@ -10,15 +10,15 @@ def download_and_organize_data():
     
     # Load configuration
     data_loader_logger.info("Loading data configuration from configs/data_configs.yaml")
-    config = load_config('configs/data_configs.yaml')
+    config = data_config
     
     data_paths = config['data_path']
     kaggle_setup = config['kaggle_setup']
     
     # Step 1: Download from Kaggle
-    data_loader_logger.info("Starting Kaggle dataset download: nguynrichard/auto-vqabest")
+    data_loader_logger.info(f"Starting Kaggle dataset download: {kaggle_setup['kaggle_project']}")
     try:
-        download_path = kagglehub.dataset_download("nguynrichard/auto-vqabest")
+        download_path = kagglehub.dataset_download(kaggle_setup['kaggle_project'])
         data_loader_logger.info(f"Dataset downloaded successfully to: {download_path}")
     except Exception as e:
         data_loader_logger.error(f"Failed to download dataset: {e}")

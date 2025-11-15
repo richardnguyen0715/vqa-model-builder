@@ -5,23 +5,21 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
+from src.middleware.config import logger_config
+
 _configured = False
 
-
-def setup_logging(config_path: str, log_engine: Optional[str] = None) -> logging.Logger:
+def setup_logging(log_engine: Optional[str] = None) -> logging.Logger:
     """Load YAML logging configuration (dictConfig), ensure file paths exist, and return a logger.
 
     Args:
-        config_path: Path to YAML file containing a logging.dictConfig-style mapping.
         log_engine: Name of the logger to return. If None, returns the root logger.
 
     Returns:
         logging.Logger: The requested logger instance.
     """
     global _configured
-
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
+    config = logger_config
 
     # Generate timestamp for this run
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -18,5 +18,6 @@ data_path:
       texts_folder: data/processed/test/texts/
 
 kaggle_setup:
+  kaggle_project: 'nguynrichard/auto-vqabest'
   images_folder: preprocessed_images/
   text_file: text/evaluate_60k_data_balanced_preprocessed.csv
