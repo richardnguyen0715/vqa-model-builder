@@ -3,6 +3,7 @@ import logging
 import logging.config
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
 
 _configured = False
 
@@ -22,11 +23,19 @@ def setup_logging(config_path: str, log_engine: Optional[str] = None) -> logging
     with open(config_path, 'r') as file:
         config = yaml.safe_load(file)
 
+    # Generate timestamp for this run
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    
+    # Update handler filenames with timestamp
     handlers = config.get('handlers', {}) or {}
     for handler in handlers.values():
         filename = handler.get('filename')
         if filename:
-            Path(filename).parent.mkdir(parents=True, exist_ok=True)
+            # Insert timestamp before file extension
+            path = Path(filename)
+            new_filename = path.parent / f"{path.stem}_{timestamp}{path.suffix}"
+            handler['filename'] = str(new_filename)
+            new_filename.parent.mkdir(parents=True, exist_ok=True)
             
     if not _configured:
         logging.config.dictConfig(config)
