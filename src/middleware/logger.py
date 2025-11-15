@@ -2,8 +2,8 @@
 import logging
 from typing import Optional
 
-from src.utils.logging_setup import setup_logging
-from src.utils.path_management import ROOT_DIR
+from utils.logging_setup import setup_logging
+from utils.path_management import ROOT_DIR
 
 
 DEFAULT_CONFIG_PATH = ROOT_DIR / 'configs' / 'logging_configs.yaml'
