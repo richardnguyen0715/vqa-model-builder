@@ -8,6 +8,7 @@ from typing import List
 
 from src.middleware.logger import data_process_logger
 from src.schema.data_schema import OneSample
+from utils.path_management import PROCESSED_DATA_DIR
 
 
 def load_image(image_path: str) -> np.ndarray:
@@ -131,3 +132,97 @@ def load_raw_data(images_dir: str, text_file_path: str) -> List[OneSample]:
 
     data_process_logger.info(f"Loaded {len(data_samples)} data samples successfully.")
     return data_samples
+
+
+def validate_data(raw_data):
+    """Validate the loaded raw data samples."""
+    if not raw_data:
+        data_process_logger.error("No data samples loaded.")
+        raise ValueError("No data samples loaded.")
+    for i, sample in enumerate(raw_data):
+        if sample.image.size == 0:
+            data_process_logger.error(f"Sample {i} has empty image data.")
+            raise ValueError(f"Sample {i} has empty image data.")
+        if not sample.question:
+            data_process_logger.error(f"Sample {i} has empty question.")
+            raise ValueError(f"Sample {i} has empty question.")
+        if not sample.answers:
+            data_process_logger.error(f"Sample {i} has empty answers.")
+            raise ValueError(f"Sample {i} has empty answers.")
+        
+        
+def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True):
+    """Split raw data into training, validation, and test sets.
+
+    Args:
+        raw_data: List of OneSample instances.
+        train_ratio: Proportion of data to use for training.
+        val_ratio: Proportion of data to use for validation.
+        is_random: Whether to shuffle data before splitting.
+    Returns:
+        Tuple of (train_data, val_data, test_data).
+    """
+    total_samples = len(raw_data)
+    if is_random:
+        import random
+        random.shuffle(raw_data)
+
+    train_end = int(total_samples * train_ratio)
+    val_end = train_end + int(total_samples * val_ratio)
+
+    train_data = raw_data[:train_end]
+    val_data = raw_data[train_end:val_end]
+    test_data = raw_data[val_end:]
+
+    data_process_logger.info(f"Data split into {len(train_data)} training, {len(val_data)} validation, and {len(test_data)} test samples. IS_RANDOM={is_random}")
+    return train_data, val_data, test_data
+
+
+def save_data(train_data, val_data, test_data):
+    """Save the split data into processed data directory.
+
+    Args:
+        train_data: List of training data samples.
+        val_data: List of validation data samples.
+        test_data: List of test data samples.
+        
+    Action:
+        - Move all images to raw/train, raw/val, raw/test directories.
+        - Save text metadata as json 
+    """
+    
+    import os
+    import json
+    from pathlib import Path
+    from shutil import copy2
+
+    splits = {
+        'train': train_data,
+        'val': val_data,
+        'test': test_data
+    }
+
+    for split_name, data_samples in splits.items():
+        split_image_dir = PROCESSED_DATA_DIR / 'raw' / split_name
+        split_image_dir.mkdir(parents=True, exist_ok=True)
+        metadata_list = []
+
+        for sample in data_samples:
+            image_filename = os.path.basename(sample.image_path)
+            dest_image_path = split_image_dir / image_filename
+            copy2(sample.image_path, dest_image_path)
+
+            metadata = {
+                'image_path': str(dest_image_path),
+                'question': sample.question,
+                'answers': sample.answers,
+                'metadata': sample.metadata
+            }
+            metadata_list.append(metadata)
+
+        metadata_file_path = PROCESSED_DATA_DIR / f'{split_name}_metadata.json'
+        with open(metadata_file_path, 'w') as f:
+            json.dump(metadata_list, f, indent=4)
+
+        data_process_logger.info(f"Saved {len(data_samples)} samples to {split_name} split at {split_image_dir} and metadata to {metadata_file_path}")
+    
