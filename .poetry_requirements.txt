@@ -2,3 +2,4 @@ pyyaml
 kagglehub
 opencv-python
 pydantic
+tqdm

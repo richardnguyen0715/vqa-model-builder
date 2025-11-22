@@ -1,0 +1,13 @@
+memory_monitor:
+  max_ram_percent: 95
+  warn_threshold_percent: 80
+
+cpu_monitor:
+  cpu_memory_check_interval: 5
+  warn_threshold_percent: 80
+  max_cpu_memory_percent: 95
+
+gpu_monitor:
+  gpu_memory_check_interval: 5
+  warn_threshold_percent: 80
+  max_gpu_memory_percent: 95

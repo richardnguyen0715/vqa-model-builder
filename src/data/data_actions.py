@@ -4,11 +4,12 @@ import numpy as np
 import pandas as pd
 import ast
 from typing import List
-
+from tqdm import tqdm
 
 from src.middleware.logger import data_process_logger
 from src.schema.data_schema import OneSample
 from utils.path_management import PROCESSED_DATA_DIR
+from src.exception.data_exception_handling import MemoryOverflowException
 
 
 def load_image(image_path: str) -> np.ndarray:
@@ -68,10 +69,15 @@ def load_raw_data(images_dir: str, text_file_path: str) -> List[OneSample]:
     Returns:
         List of OneSample instances.
     """
+    # Lazy import to avoid circular dependency
+    from src.middleware.monitor import memory_monitor
+    
     data_samples = []
     
     # Load text data
     data_process_logger.info(f"Loading text data from: {text_file_path}")
+    memory_monitor.check_memory_usage("Before loading text data")
+    
     text_data = load_text_data(text_file_path)
     
     # Check required columns
@@ -82,13 +88,19 @@ def load_raw_data(images_dir: str, text_file_path: str) -> List[OneSample]:
 
     # Get all image paths
     data_process_logger.info(f"Retrieving image paths from directory: {images_dir}")
+    memory_monitor.check_memory_usage("Before retrieving image paths")
+    
     image_paths = get_all_image_paths(images_dir)
     # Create a mapping from filename to full path
     image_path_map = {os.path.basename(p): p for p in image_paths}
 
-    # Iterate through text data and match with images
-    for idx, row in text_data.iterrows():
+    # Iterate through text data and match with images with progress bar
+    for idx, row in tqdm(text_data.iterrows(), total=len(text_data), desc="Loading data samples"):
         try:
+            # Check memory every 100 samples
+            if idx % 100 == 0:
+                memory_monitor.check_memory_usage(f"Loading sample {idx}")
+            
             # Extract image filename from image_link URL
             # Example: http://images.cocodataset.org/train2017/000000581569.jpg -> 000000581569.jpg
             image_link = row['image_link']
@@ -126,11 +138,20 @@ def load_raw_data(images_dir: str, text_file_path: str) -> List[OneSample]:
             else:
                 data_process_logger.warning(f"Image file not found for entry {idx}: {image_filename}")
         
+        except MemoryOverflowException as e:
+            data_process_logger.critical(f"Memory overflow at sample {idx}: {e}")
+            memory_report = memory_monitor.get_memory_report()
+            data_process_logger.critical(f"Memory report: {memory_report}")
+            raise
         except Exception as e:
             data_process_logger.error(f"Error processing row {idx}: {e}")
             continue
 
+    memory_monitor.check_memory_usage("After loading all samples")
+    memory_report = memory_monitor.get_memory_report()
     data_process_logger.info(f"Loaded {len(data_samples)} data samples successfully.")
+    data_process_logger.info(f"Memory report: {memory_report}")
+    
     return data_samples
 
 
@@ -207,7 +228,7 @@ def save_data(train_data, val_data, test_data):
         split_image_dir.mkdir(parents=True, exist_ok=True)
         metadata_list = []
 
-        for sample in data_samples:
+        for sample in tqdm(data_samples, desc=f"Saving {split_name} data"):
             image_filename = os.path.basename(sample.image_path)
             dest_image_path = split_image_dir / image_filename
             copy2(sample.image_path, dest_image_path)
