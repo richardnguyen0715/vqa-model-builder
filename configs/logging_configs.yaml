@@ -8,8 +8,8 @@ formatters:
   data_loader:
     format: '%(asctime)s - DATA_LOADER - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
     datefmt: '%Y-%m-%d %H:%M:%S'
-  model_trainer:
-    format: '%(asctime)s - MODEL_TRAINER - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+  model_builder:
+    format: '%(asctime)s - model_builder - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
     datefmt: '%Y-%m-%d %H:%M:%S'
   data_process:
     format: '%(asctime)s - DATA_PROCESS - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
@@ -22,10 +22,10 @@ handlers:
     filename: logs/data_loader/data_loader.log
     level: DEBUG
     encoding: utf-8
-  model_trainer_file:
+  model_builder_file:
     class: logging.FileHandler
-    formatter: model_trainer
-    filename: logs/model_trainer/model_trainer.log
+    formatter: model_builder
+    filename: logs/model_builder/model_builder.log
     level: DEBUG
     encoding: utf-8
   data_process_file:
@@ -44,9 +44,9 @@ loggers:
     level: DEBUG
     handlers: [data_loader_file, console]
     propagate: false
-  model_trainer_logger:
+  model_builder_logger:
     level: DEBUG
-    handlers: [model_trainer_file, console]
+    handlers: [model_builder_file, console]
     propagate: false
   data_process_logger:
     level: DEBUG
