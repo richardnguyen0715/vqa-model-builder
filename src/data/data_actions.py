@@ -199,6 +199,125 @@ def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True):
     return train_data, val_data, test_data
 
 
+def load_data_split(images_dir: str, text_file_path: str, split_type: str = 'train', 
+                    train_ratio: float = 0.8, val_ratio: float = 0.1, 
+                    start_idx: int = None, end_idx: int = None) -> List[OneSample]:
+    """
+    Load a specific data split (train/val/test) without loading all data into memory at once.
+    
+    Args:
+        images_dir: Directory containing raw images.
+        text_file_path: Path to the text data file (CSV).
+        split_type: 'train', 'val', or 'test' - which split to load
+        train_ratio: Proportion of data for training
+        val_ratio: Proportion of data for validation
+        start_idx: Start index for custom range (if None, auto-calculated)
+        end_idx: End index for custom range (if None, auto-calculated)
+        
+    Returns:
+        List of OneSample instances for the specified split.
+    """
+    # Lazy import to avoid circular dependency
+    from src.middleware.monitor import memory_monitor
+    
+    data_samples = []
+    
+    # Load text data
+    data_process_logger.info(f"Loading text data from: {text_file_path}")
+    memory_monitor.check_memory_usage(f"Before loading {split_type} split")
+    
+    text_data = load_text_data(text_file_path)
+    total_samples = len(text_data)
+    
+    # Check required columns
+    required_columns = ['image_link', 'question', 'answers']
+    missing_columns = [col for col in required_columns if col not in text_data.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    # Calculate split indices if not provided
+    if start_idx is None or end_idx is None:
+        train_end = int(total_samples * train_ratio)
+        val_end = train_end + int(total_samples * val_ratio)
+        
+        if split_type == 'train':
+            start_idx, end_idx = 0, train_end
+        elif split_type == 'val':
+            start_idx, end_idx = train_end, val_end
+        elif split_type == 'test':
+            start_idx, end_idx = val_end, total_samples
+        else:
+            raise ValueError(f"Invalid split_type: {split_type}")
+
+    # Get all image paths
+    data_process_logger.info(f"Retrieving image paths from directory: {images_dir}")
+    image_paths = get_all_image_paths(images_dir)
+    image_path_map = {os.path.basename(p): p for p in image_paths}
+
+    # Load only the specified split
+    data_process_logger.info(f"Loading {split_type} split (indices {start_idx}-{end_idx})")
+    
+    for idx in tqdm(range(start_idx, end_idx), desc=f"Loading {split_type} data", total=(end_idx - start_idx)):
+        try:
+            # Check memory every 100 samples
+            if (idx - start_idx) % 100 == 0:
+                memory_monitor.check_memory_usage(f"Loading {split_type} sample {idx - start_idx}")
+            
+            row = text_data.iloc[idx]
+            
+            # Extract image filename from image_link URL
+            image_link = row['image_link']
+            image_filename = os.path.basename(image_link)
+            
+            question = row['question']
+            
+            # Parse answers from string representation to list
+            answers_str = row['answers']
+            if isinstance(answers_str, str):
+                answers = ast.literal_eval(answers_str)
+            else:
+                answers = answers_str
+            
+            # Check if answers is a list
+            if not isinstance(answers, list):
+                data_process_logger.warning(f"Row {idx}: answers is not a list, skipping")
+                continue
+
+            # Find corresponding image
+            if image_filename in image_path_map:
+                image_path = image_path_map[image_filename]
+                image = load_image(image_path)
+
+                sample = OneSample(
+                    image=image,
+                    question=question,
+                    answers=answers,
+                    metadata={
+                        "image_path": image_path,
+                        "answer_count": len(answers)
+                    }
+                )
+                data_samples.append(sample)
+            else:
+                data_process_logger.warning(f"Image file not found for entry {idx}: {image_filename}")
+        
+        except MemoryOverflowException as e:
+            data_process_logger.critical(f"Memory overflow at {split_type} sample {idx}: {e}")
+            memory_report = memory_monitor.get_memory_report()
+            data_process_logger.critical(f"Memory report: {memory_report}")
+            raise
+        except Exception as e:
+            data_process_logger.error(f"Error processing row {idx}: {e}")
+            continue
+
+    memory_monitor.check_memory_usage(f"After loading {split_type} split")
+    memory_report = memory_monitor.get_memory_report()
+    data_process_logger.info(f"Loaded {len(data_samples)} {split_type} samples successfully.")
+    data_process_logger.info(f"Memory report: {memory_report}")
+    
+    return data_samples
+
+
 def save_data(train_data, val_data, test_data):
     """Save the split data into processed data directory.
 
