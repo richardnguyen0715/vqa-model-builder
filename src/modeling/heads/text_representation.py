@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from typing import Dict, Optional, Union, Tuple
 from abc import ABC, abstractmethod
 import warnings
+from src.middleware.logger import model_builder_logger as logger
 
 
 # Utility function to load pretrained language models
@@ -26,16 +27,16 @@ def load_pretrained_language_model(model_name: str, source: str = 'huggingface')
     try:
         from transformers import AutoModel, AutoTokenizer, AutoConfig
         
-        print(f"Loading pretrained model: {model_name} from HuggingFace...")
+        logger.info(f"Loading pretrained model: {model_name} from HuggingFace...")
         
         # Load model and tokenizer
         config = AutoConfig.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         
-        print(f"Successfully loaded {model_name}")
-        print(f"  Hidden size: {config.hidden_size}")
-        print(f"  Vocab size: {config.vocab_size}")
+        logger.info(f"Successfully loaded {model_name}")
+        logger.info(f"  Hidden size: {config.hidden_size}")
+        logger.info(f"  Vocab size: {config.vocab_size}")
         
         return model, tokenizer, config
         
@@ -143,9 +144,9 @@ class BERTTextEmbedding(BaseTextRepresentation):
         if not finetune:
             for param in self.bert_model.parameters():
                 param.requires_grad = False
-            print(f"BERT parameters frozen (finetune=False)")
+            logger.info(f"BERT parameters frozen (finetune=False)")
         else:
-            print(f"BERT parameters trainable (finetune=True)")
+            logger.info(f"BERT parameters trainable (finetune=True)")
         
         # Optional projection layer
         if add_projection and self.hidden_size != output_dim:
@@ -274,9 +275,9 @@ class RoBERTaTextEmbedding(BaseTextRepresentation):
         if not finetune:
             for param in self.roberta_model.parameters():
                 param.requires_grad = False
-            print(f"RoBERTa parameters frozen (finetune=False)")
+            logger.info(f"RoBERTa parameters frozen (finetune=False)")
         else:
-            print(f"RoBERTa parameters trainable (finetune=True)")
+            logger.info(f"RoBERTa parameters trainable (finetune=True)")
         
         # Optional projection layer
         if add_projection and self.hidden_size != output_dim:
@@ -396,9 +397,9 @@ class DeBERTaV3TextEmbedding(BaseTextRepresentation):
         if not finetune:
             for param in self.deberta_model.parameters():
                 param.requires_grad = False
-            print(f"DeBERTa V3 parameters frozen (finetune=False)")
+            logger.info(f"DeBERTa V3 parameters frozen (finetune=False)")
         else:
-            print(f"DeBERTa V3 parameters trainable (finetune=True)")
+            logger.info(f"DeBERTa V3 parameters trainable (finetune=True)")
         
         # Optional projection layer
         if add_projection and self.hidden_size != output_dim:
@@ -511,7 +512,7 @@ class GenericTransformerTextEmbedding(BaseTextRepresentation):
             try:
                 from transformers import AutoModel, AutoTokenizer, AutoConfig
                 
-                print(f"Loading generic transformer model: {model_name}")
+                logger.info(f"Loading generic transformer model: {model_name}")
                 
                 # Load with optional trust_remote_code
                 self.config = AutoConfig.from_pretrained(
@@ -528,7 +529,7 @@ class GenericTransformerTextEmbedding(BaseTextRepresentation):
                 )
                 
                 self.hidden_size = self.config.hidden_size
-                print(f"Successfully loaded {model_name} (hidden_size: {self.hidden_size})")
+                logger.info(f"Successfully loaded {model_name} (hidden_size: {self.hidden_size})")
                 
             except Exception as e:
                 raise ValueError(f"Error loading model {model_name}: {e}")
@@ -539,9 +540,9 @@ class GenericTransformerTextEmbedding(BaseTextRepresentation):
         if not finetune:
             for param in self.transformer_model.parameters():
                 param.requires_grad = False
-            print(f"Model parameters frozen (finetune=False)")
+            logger.info(f"Model parameters frozen (finetune=False)")
         else:
-            print(f"Model parameters trainable (finetune=True)")
+            logger.info(f"Model parameters trainable (finetune=True)")
         
         # Optional projection layer
         if add_projection and self.hidden_size != output_dim:
@@ -658,7 +659,7 @@ def create_text_representation(
     
     if model_type not in model_registry:
         # If model_type is not recognized, treat it as a model name and use generic
-        print(f"Model type '{model_type}' not found in registry. Using GenericTransformerTextEmbedding.")
+        logger.info(f"Model type '{model_type}' not found in registry. Using GenericTransformerTextEmbedding.")
         return GenericTransformerTextEmbedding(model_name=model_type, **kwargs)
     
     return model_registry[model_type](**kwargs)

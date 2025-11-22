@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from typing import Tuple, Optional, List, Union
 from abc import ABC, abstractmethod
 import warnings
+from src.middleware.logger import model_builder_logger as logger
 
 
 # Utility function to load pretrained backbones
@@ -35,12 +36,12 @@ def load_pretrained_backbone(backbone_name: str, source: str = 'auto'):
             elif backbone_name == 'resnet152':
                 backbone = models.resnet152(weights=models.ResNet152_Weights.IMAGENET1K_V2)
             backbone_dim = 2048
-            print(f"Loaded {backbone_name} from torchvision with ImageNet weights")
+            logger.info(f"Loaded {backbone_name} from torchvision with ImageNet weights")
         except AttributeError:
             # Fallback for older torchvision
             backbone = getattr(models, backbone_name)(pretrained=True)
             backbone_dim = 2048
-            print(f"Loaded {backbone_name} from torchvision (legacy API)")
+            logger.info(f"Loaded {backbone_name} from torchvision (legacy API)")
         return backbone, backbone_dim
     
     # ViT models from HuggingFace
@@ -59,7 +60,7 @@ def load_pretrained_backbone(backbone_name: str, source: str = 'auto'):
             model_id = model_map.get(backbone_name, backbone_name)
             backbone = ViTModel.from_pretrained(model_id)
             backbone_dim = backbone.config.hidden_size
-            print(f"Loaded {model_id} from HuggingFace")
+            logger.info(f"Loaded {model_id} from HuggingFace")
             return backbone, backbone_dim
         except ImportError:
             raise ImportError("transformers library required for ViT models. Install: pip install transformers")
@@ -70,7 +71,7 @@ def load_pretrained_backbone(backbone_name: str, source: str = 'auto'):
             import timm
             backbone = timm.create_model(backbone_name, pretrained=True, features_only=True)
             backbone_dim = backbone.feature_info.channels()[-1]
-            print(f"Loaded {backbone_name} from timm")
+            logger.info(f"Loaded {backbone_name} from timm")
             return backbone, backbone_dim
         except ImportError:
             raise ImportError("timm library required. Install: pip install timm")
@@ -331,7 +332,7 @@ class VisionTransformerEmbedding(BaseImageRepresentation):
         """Load pretrained ViT weights from HuggingFace or timm."""
         try:
             from transformers import ViTModel
-            print(f"Loading pretrained ViT from HuggingFace...")
+            logger.info(f"Loading pretrained ViT from HuggingFace...")
             
             # Load pretrained ViT model
             pretrained_vit = ViTModel.from_pretrained('google/vit-base-patch16-224-in21k')
@@ -377,20 +378,20 @@ class VisionTransformerEmbedding(BaseImageRepresentation):
             self.norm.weight.data = pretrained_vit.layernorm.weight.data
             self.norm.bias.data = pretrained_vit.layernorm.bias.data
             
-            print("Successfully loaded pretrained ViT weights from HuggingFace")
+            logger.info("Successfully loaded pretrained ViT weights from HuggingFace")
             
         except ImportError:
-            print("transformers library not found. Trying timm...")
+            logger.info("transformers library not found. Trying timm...")
             try:
                 import timm
                 pretrained_vit = timm.create_model('vit_base_patch16_224', pretrained=True)
                 # Load weights from timm model
                 self.load_state_dict(pretrained_vit.state_dict(), strict=False)
-                print("Successfully loaded pretrained ViT weights from timm")
+                logger.info("Successfully loaded pretrained ViT weights from timm")
             except ImportError:
-                print("Neither transformers nor timm found. Using random initialization.")
+                logger.info("Neither transformers nor timm found. Using random initialization.")
         except Exception as e:
-            print(f"Error loading pretrained weights: {e}. Using random initialization.")
+            logger.info(f"Error loading pretrained weights: {e}. Using random initialization.")
     
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """
