@@ -3,3 +3,9 @@ kagglehub
 opencv-python
 pydantic
 tqdm
+torch
+torchvision
+transformers
+timm
+clip @ git+https://github.com/openai/CLIP.git
+pillow
