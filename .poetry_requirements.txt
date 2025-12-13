@@ -9,3 +9,4 @@ transformers
 timm
 clip @ git+https://github.com/openai/CLIP.git
 pillow
+nltk
