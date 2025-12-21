@@ -109,6 +109,7 @@ class ConfigPaths:
         inference: Path to inference configuration file.
         logging: Path to logging configuration file.
         warning: Path to warning configuration file.
+        resource: Path to resource management configuration file.
     """
     data: Path = field(default_factory=lambda: get_config_dir() / "data_configs.yaml")
     model: Path = field(default_factory=lambda: get_config_dir() / "model_configs.yaml")
@@ -117,6 +118,7 @@ class ConfigPaths:
     inference: Path = field(default_factory=lambda: get_config_dir() / "inference_configs.yaml")
     logging: Path = field(default_factory=lambda: get_config_dir() / "logging_configs.yaml")
     warning: Path = field(default_factory=lambda: get_config_dir() / "warning_configs.yaml")
+    resource: Path = field(default_factory=lambda: get_config_dir() / "resource_configs.yaml")
 
 
 class ConfigManager:
@@ -159,6 +161,7 @@ class ConfigManager:
             "inference": self.paths.inference,
             "logging": self.paths.logging,
             "warning": self.paths.warning,
+            "resource": self.paths.resource,
         }
         
         for name, path in config_files.items():
@@ -242,6 +245,11 @@ class ConfigManager:
     def warning(self) -> Dict[str, Any]:
         """Get warning configuration."""
         return self._configs.get("warning", {})
+    
+    @property
+    def resource(self) -> Dict[str, Any]:
+        """Get resource management configuration."""
+        return self._configs.get("resource", {})
 
 
 # =============================================================================

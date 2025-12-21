@@ -1,6 +1,7 @@
 """
 VQA Evaluator Module
 Provides comprehensive evaluation for Vietnamese VQA models.
+Includes resource monitoring during evaluation.
 """
 
 import os
@@ -22,6 +23,17 @@ from .evaluator_config import (
     get_default_evaluation_config
 )
 
+# Resource management imports
+try:
+    from src.resource_management import (
+        ResourceMonitor,
+        ReportManager,
+        load_resource_config,
+    )
+    RESOURCE_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    RESOURCE_MANAGEMENT_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +50,7 @@ class EvaluationResult:
         predictions: All predictions if saved
         errors: Error examples
         metadata: Additional metadata
+        resource_metrics: Resource usage metrics during evaluation
     """
     overall_metrics: Dict[str, float] = field(default_factory=dict)
     per_type_metrics: Dict[str, Dict[str, float]] = field(default_factory=dict)
@@ -46,6 +59,7 @@ class EvaluationResult:
     predictions: List[Dict[str, Any]] = field(default_factory=list)
     errors: List[Dict[str, Any]] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    resource_metrics: Dict[str, Any] = field(default_factory=dict)
 
 
 class VQAEvaluator:
@@ -57,18 +71,21 @@ class VQAEvaluator:
     - Per-type analysis
     - Error analysis
     - Visualization support
+    - Resource monitoring during evaluation
     
     Attributes:
         config: Evaluation configuration
         device: Evaluation device
         metrics: Dictionary of metric calculators
+        resource_monitor: Optional resource monitor for tracking usage
     """
     
     def __init__(
         self,
         config: Optional[EvaluationConfig] = None,
         answer_vocabulary: Optional[List[str]] = None,
-        question_type_mapping: Optional[Dict[str, str]] = None
+        question_type_mapping: Optional[Dict[str, str]] = None,
+        enable_resource_monitoring: bool = True
     ):
         """
         Initialize evaluator.
@@ -77,6 +94,7 @@ class VQAEvaluator:
             config: Evaluation configuration
             answer_vocabulary: List of answer strings
             question_type_mapping: Mapping of question to type
+            enable_resource_monitoring: Enable resource monitoring during evaluation
         """
         self.config = config or get_default_evaluation_config()
         self.device = self._get_device()
@@ -86,6 +104,9 @@ class VQAEvaluator:
         
         # Setup metrics
         self.metrics = self._setup_metrics()
+        
+        # Setup resource monitoring
+        self.resource_monitor = self._setup_resource_monitor(enable_resource_monitoring)
         
         logger.info(f"Initialized evaluator on {self.device}")
     
@@ -125,6 +146,49 @@ class VQAEvaluator:
             metrics[f"top_{k}_accuracy"] = TopKAccuracyCalculator(k=k)
         
         return metrics
+    
+    def _setup_resource_monitor(
+        self, 
+        enable: bool = True
+    ) -> Optional["ResourceMonitor"]:
+        """
+        Setup resource monitor for tracking usage during evaluation.
+        
+        Args:
+            enable: Whether to enable resource monitoring.
+            
+        Returns:
+            ResourceMonitor instance or None if not available.
+        """
+        if not enable or not RESOURCE_MANAGEMENT_AVAILABLE:
+            return None
+        
+        try:
+            resource_config = load_resource_config()
+            monitor = ResourceMonitor(resource_config)
+            logger.info("Resource monitoring enabled for evaluation")
+            return monitor
+        except Exception as e:
+            logger.warning(f"Failed to setup resource monitor: {e}")
+            return None
+    
+    def _get_resource_snapshot(self) -> Optional[Dict[str, Any]]:
+        """
+        Get current resource usage snapshot.
+        
+        Returns:
+            Dictionary with resource metrics or None if monitoring not available.
+        """
+        if self.resource_monitor is None:
+            return None
+        
+        try:
+            metrics = self.resource_monitor.get_latest_metrics()
+            if metrics is not None:
+                return metrics.to_dict()
+        except Exception:
+            pass
+        return None
     
     def _id_to_answer(self, answer_id: int) -> str:
         """Convert answer ID to string."""
@@ -184,18 +248,27 @@ class VQAEvaluator:
         """
         Evaluate model on dataset.
         
+        Tracks resource usage during evaluation if monitoring is enabled.
+        
         Args:
             model: VQA model to evaluate
             dataloader: Evaluation data loader
             return_predictions: Whether to return all predictions
             
         Returns:
-            EvaluationResult with all metrics
+            EvaluationResult with all metrics and resource usage
         """
         model = model.to(self.device)
         model.eval()
         
         start_time = time.time()
+        
+        # Start resource monitoring for evaluation
+        if self.resource_monitor is not None:
+            self.resource_monitor.start()
+            initial_resources = self._get_resource_snapshot()
+        else:
+            initial_resources = None
         
         all_predictions = []
         all_targets = []
@@ -205,45 +278,50 @@ class VQAEvaluator:
         
         logger.info("Starting evaluation...")
         
-        for batch in dataloader:
-            batch = self._to_device(batch)
-            
-            # Forward pass
-            if self.config.use_fp16 and self.device.type == "cuda":
-                with torch.amp.autocast():
+        try:
+            for batch in dataloader:
+                batch = self._to_device(batch)
+                
+                # Forward pass
+                if self.config.use_fp16 and self.device.type == "cuda":
+                    with torch.amp.autocast():
+                        outputs = model(
+                            image=batch.get("image", batch.get("images")),
+                            input_ids=batch.get("input_ids"),
+                            attention_mask=batch.get("attention_mask")
+                        )
+                else:
                     outputs = model(
                         image=batch.get("image", batch.get("images")),
                         input_ids=batch.get("input_ids"),
                         attention_mask=batch.get("attention_mask")
                     )
-            else:
-                outputs = model(
-                    image=batch.get("image", batch.get("images")),
-                    input_ids=batch.get("input_ids"),
-                    attention_mask=batch.get("attention_mask")
-                )
-            
-            logits = outputs.logits if hasattr(outputs, "logits") else outputs["logits"]
-            probs = torch.softmax(logits, dim=-1)
-            predictions = logits.argmax(dim=-1)
-            
-            targets = batch.get("labels", batch.get("answer_ids"))
-            questions = batch.get("questions", [""] * targets.size(0))
-            
-            all_predictions.extend(predictions.cpu().tolist())
-            all_targets.extend(targets.cpu().tolist())
-            all_probs.extend(probs.cpu().tolist())
-            
-            if isinstance(questions, torch.Tensor):
-                questions = questions.tolist()
-            all_questions.extend(questions)
-            
-            # Get question types
-            for q in questions:
-                if isinstance(q, str):
-                    all_question_types.append(self._get_question_type(q))
-                else:
-                    all_question_types.append("unknown")
+                
+                logits = outputs.logits if hasattr(outputs, "logits") else outputs["logits"]
+                probs = torch.softmax(logits, dim=-1)
+                predictions = logits.argmax(dim=-1)
+                
+                targets = batch.get("labels", batch.get("answer_ids"))
+                questions = batch.get("questions", [""] * targets.size(0))
+                
+                all_predictions.extend(predictions.cpu().tolist())
+                all_targets.extend(targets.cpu().tolist())
+                all_probs.extend(probs.cpu().tolist())
+                
+                if isinstance(questions, torch.Tensor):
+                    questions = questions.tolist()
+                all_questions.extend(questions)
+                
+                # Get question types
+                for q in questions:
+                    if isinstance(q, str):
+                        all_question_types.append(self._get_question_type(q))
+                    else:
+                        all_question_types.append("unknown")
+        finally:
+            # Stop resource monitoring
+            if self.resource_monitor is not None:
+                self.resource_monitor.stop()
         
         eval_time = time.time() - start_time
         
@@ -258,6 +336,14 @@ class VQAEvaluator:
         
         result.metadata["eval_time"] = eval_time
         result.metadata["num_samples"] = len(all_predictions)
+        
+        # Add resource metrics
+        final_resources = self._get_resource_snapshot()
+        if initial_resources or final_resources:
+            result.resource_metrics = {
+                "initial": initial_resources,
+                "final": final_resources,
+            }
         
         # Save predictions if requested
         if return_predictions or self.config.analysis.save_predictions:
@@ -385,6 +471,8 @@ class VQAEvaluator:
         """
         Save evaluation results to file.
         
+        Includes resource metrics if monitoring was enabled.
+        
         Args:
             result: Evaluation results
             output_path: Output file path
@@ -399,6 +487,10 @@ class VQAEvaluator:
             "per_answer_metrics": result.per_answer_metrics,
             "metadata": result.metadata
         }
+        
+        # Add resource metrics if available
+        if result.resource_metrics:
+            data["resource_metrics"] = result.resource_metrics
         
         if result.predictions:
             data["num_predictions"] = len(result.predictions)

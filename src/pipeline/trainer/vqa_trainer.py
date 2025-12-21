@@ -2,6 +2,7 @@
 VQA Trainer Module
 Provides the main trainer class for Vietnamese VQA models.
 Integrates with centralized configuration system and checkpoint management.
+Includes resource monitoring and automatic backup functionality.
 """
 
 import os
@@ -39,6 +40,18 @@ from .training_utils import (
 from .checkpoint_manager import CheckpointManager
 from src.middleware.config_loader import get_config, get_config_manager
 
+# Resource management imports
+try:
+    from src.resource_management import (
+        ResourceManager,
+        get_resource_manager,
+        resource_managed_training,
+        load_resource_config,
+    )
+    RESOURCE_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    RESOURCE_MANAGEMENT_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,11 +65,13 @@ class TrainingState:
         global_step: Global training step
         best_metric: Best validation metric
         is_best: Whether current epoch is best
+        resource_task_id: Task ID for resource tracking
     """
     epoch: int = 0
     global_step: int = 0
     best_metric: float = 0.0
     is_best: bool = False
+    resource_task_id: Optional[str] = None
 
 
 class VQATrainer:
@@ -71,6 +86,7 @@ class VQATrainer:
     - Checkpointing (integrated with CheckpointManager)
     - Logging (TensorBoard, W&B)
     - Configuration from YAML files
+    - Resource monitoring and automatic backup
     
     Attributes:
         model: VQA model to train
@@ -82,6 +98,7 @@ class VQATrainer:
         early_stopping: Early stopping handler
         checkpoint_manager: Checkpoint management handler
         state: Current training state
+        resource_manager: Resource monitoring and backup handler
     """
     
     def __init__(
@@ -141,6 +158,9 @@ class VQATrainer:
         
         # Setup checkpoint manager
         self.checkpoint_manager = self._setup_checkpoint_manager()
+        
+        # Setup resource manager for monitoring and automatic backup
+        self.resource_manager = self._setup_resource_manager()
         
         # Gradient accumulation
         grad_accum_steps = self._get_training_param(
@@ -377,6 +397,45 @@ class VQATrainer:
             metric_name=self.config.checkpoint.metric_for_best,
             metric_mode=self.config.checkpoint.mode
         )
+    
+    def _setup_resource_manager(self) -> Optional["ResourceManager"]:
+        """
+        Setup resource manager for monitoring and automatic backup.
+        
+        Creates and configures resource manager to monitor system resources
+        during training and automatically create backups when thresholds
+        are exceeded.
+        
+        Returns:
+            Initialized ResourceManager instance or None if not available.
+        """
+        if not RESOURCE_MANAGEMENT_AVAILABLE:
+            logger.info("Resource management module not available")
+            return None
+        
+        try:
+            # Load resource configuration from YAML
+            resource_config = load_resource_config()
+            
+            # Create resource manager
+            resource_manager = ResourceManager(resource_config)
+            
+            # Register model and optimizer for automatic backup
+            resource_manager.register_model(
+                model=self.model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+            )
+            
+            # Start monitoring
+            resource_manager.start()
+            
+            logger.info("Resource manager initialized with monitoring and auto-backup")
+            return resource_manager
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize resource manager: {e}")
+            return None
     
     def _setup_interrupt_handler(self) -> None:
         """Setup handler to save checkpoint on keyboard interrupt."""
@@ -757,8 +816,36 @@ class VQATrainer:
             self.state.global_step += 1
             
             step_metrics["lr"] = self.optimizer.param_groups[0]["lr"]
+            
+            # Update resource tracking with step progress
+            self._update_resource_step(step_metrics)
         
         return step_metrics
+    
+    def _update_resource_step(self, step_metrics: Dict[str, float]) -> None:
+        """
+        Update resource manager with step progress.
+        
+        Args:
+            step_metrics: Metrics from the training step.
+        """
+        if self.resource_manager is None or self.state.resource_task_id is None:
+            return
+        
+        try:
+            self.resource_manager.update_training_step(
+                task_id=self.state.resource_task_id,
+                step=self.state.global_step,
+                loss=step_metrics.get("loss", 0.0),
+                metrics={
+                    k: v for k, v in step_metrics.items() 
+                    if k not in ("loss", "lr", "grad_norm")
+                },
+                learning_rate=step_metrics.get("lr"),
+            )
+        except Exception as e:
+            # Do not interrupt training if resource tracking fails
+            pass
     
     @torch.no_grad()
     def eval_step(self, batch: Dict[str, Any]) -> Dict[str, float]:
@@ -984,6 +1071,9 @@ class VQATrainer:
         """
         Run full training loop.
         
+        Integrates resource monitoring and automatic backup.
+        Tracks training progress for reporting.
+        
         Returns:
             Dictionary of training results
         """
@@ -996,57 +1086,191 @@ class VQATrainer:
             "history": {"train": [], "val": []}
         }
         
-        for epoch in range(self.state.epoch, self.config.num_epochs):
-            self.state.epoch = epoch
-            
-            # Training
-            train_metrics = self.train_epoch()
-            training_results["history"]["train"].append(train_metrics)
-            
-            # Evaluation
-            val_metrics = {}
-            if (epoch + 1) % self.config.logging.eval_interval == 0:
-                val_metrics = self.evaluate()
-                training_results["history"]["val"].append(val_metrics)
-            
-            # Log epoch results
-            self._log_epoch(epoch, train_metrics, val_metrics)
-            
-            # Check for best model
-            metric_key = self.config.checkpoint.metric_for_best
-            current_metric = val_metrics.get(metric_key, train_metrics.get(metric_key, 0.0))
-            
-            if self.config.checkpoint.mode == "max":
-                is_best = current_metric > self.state.best_metric
-            else:
-                is_best = current_metric < self.state.best_metric
-            
-            if is_best:
-                self.state.best_metric = current_metric
-                self.state.is_best = True
-                training_results["best_metric"] = current_metric
-                training_results["best_epoch"] = epoch
-            else:
-                self.state.is_best = False
-            
-            # Save checkpoint
-            self._save_checkpoint(is_best)
-            
-            # Early stopping
-            if self.early_stopping is not None:
-                if self.early_stopping(current_metric):
-                    logger.info("Early stopping triggered")
-                    break
+        # Start resource tracking if available
+        steps_per_epoch = (
+            len(self.train_dataloader) if self.train_dataloader else 100
+        )
+        self._start_resource_tracking(steps_per_epoch)
         
-        # Cleanup
-        self._cleanup()
+        try:
+            for epoch in range(self.state.epoch, self.config.num_epochs):
+                self.state.epoch = epoch
+                
+                # Notify resource manager of epoch start
+                self._on_epoch_start(epoch)
+                
+                # Training
+                train_metrics = self.train_epoch()
+                training_results["history"]["train"].append(train_metrics)
+                
+                # Evaluation
+                val_metrics = {}
+                if (epoch + 1) % self.config.logging.eval_interval == 0:
+                    val_metrics = self.evaluate()
+                    training_results["history"]["val"].append(val_metrics)
+                
+                # Log epoch results
+                self._log_epoch(epoch, train_metrics, val_metrics)
+                
+                # Notify resource manager of epoch end
+                self._on_epoch_end(
+                    epoch,
+                    train_metrics.get("loss", 0.0),
+                    val_metrics.get("loss"),
+                    val_metrics.get(self.config.checkpoint.metric_for_best)
+                )
+                
+                # Check for best model
+                metric_key = self.config.checkpoint.metric_for_best
+                current_metric = val_metrics.get(metric_key, train_metrics.get(metric_key, 0.0))
+                
+                if self.config.checkpoint.mode == "max":
+                    is_best = current_metric > self.state.best_metric
+                else:
+                    is_best = current_metric < self.state.best_metric
+                
+                if is_best:
+                    self.state.best_metric = current_metric
+                    self.state.is_best = True
+                    training_results["best_metric"] = current_metric
+                    training_results["best_epoch"] = epoch
+                else:
+                    self.state.is_best = False
+                
+                # Save checkpoint
+                self._save_checkpoint(is_best)
+                
+                # Early stopping
+                if self.early_stopping is not None:
+                    if self.early_stopping(current_metric):
+                        logger.info("Early stopping triggered")
+                        break
+        
+        finally:
+            # Complete resource tracking
+            self._complete_resource_tracking(
+                final_metric=training_results.get("best_metric", 0.0)
+            )
+            
+            # Cleanup
+            self._cleanup()
         
         logger.info(f"Training complete. Best metric: {training_results['best_metric']:.4f} at epoch {training_results['best_epoch']}")
         
         return training_results
     
+    def _start_resource_tracking(self, steps_per_epoch: int) -> None:
+        """
+        Start resource tracking for the training session.
+        
+        Args:
+            steps_per_epoch: Number of training steps per epoch.
+        """
+        if self.resource_manager is None:
+            return
+        
+        try:
+            task_id = self.resource_manager.start_training(
+                name="VQA Training",
+                total_epochs=self.config.num_epochs,
+                steps_per_epoch=steps_per_epoch,
+                metadata={
+                    "batch_size": self.config.data.batch_size,
+                    "learning_rate": self.config.optimizer.lr,
+                    "model_params": count_parameters(self.model),
+                    "mixed_precision": self.config.mixed_precision.value,
+                }
+            )
+            self.state.resource_task_id = task_id
+            logger.info(f"Started resource tracking with task ID: {task_id}")
+        except Exception as e:
+            logger.warning(f"Failed to start resource tracking: {e}")
+    
+    def _on_epoch_start(self, epoch: int) -> None:
+        """
+        Notify resource manager of epoch start.
+        
+        Args:
+            epoch: Current epoch number.
+        """
+        if self.resource_manager is None or self.state.resource_task_id is None:
+            return
+        
+        try:
+            current_lr = self.optimizer.param_groups[0]["lr"]
+            self.resource_manager.start_epoch(
+                task_id=self.state.resource_task_id,
+                epoch=epoch,
+                learning_rate=current_lr,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify epoch start: {e}")
+    
+    def _on_epoch_end(
+        self,
+        epoch: int,
+        train_loss: float,
+        val_loss: Optional[float] = None,
+        val_metric: Optional[float] = None,
+    ) -> None:
+        """
+        Notify resource manager of epoch end.
+        
+        Args:
+            epoch: Current epoch number.
+            train_loss: Training loss for the epoch.
+            val_loss: Optional validation loss.
+            val_metric: Optional validation metric.
+        """
+        if self.resource_manager is None or self.state.resource_task_id is None:
+            return
+        
+        try:
+            self.resource_manager.end_epoch(
+                task_id=self.state.resource_task_id,
+                epoch=epoch,
+                train_loss=train_loss,
+                val_loss=val_loss,
+                val_metric=val_metric,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to notify epoch end: {e}")
+    
+    def _complete_resource_tracking(
+        self,
+        final_metric: float = 0.0,
+    ) -> None:
+        """
+        Complete resource tracking for the training session.
+        
+        Args:
+            final_metric: Final metric value.
+        """
+        if self.resource_manager is None or self.state.resource_task_id is None:
+            return
+        
+        try:
+            self.resource_manager.complete_training(
+                task_id=self.state.resource_task_id,
+                final_metrics={
+                    self.config.checkpoint.metric_for_best: final_metric,
+                    "best_epoch": self.state.epoch,
+                }
+            )
+            logger.info("Resource tracking completed")
+        except Exception as e:
+            logger.warning(f"Failed to complete resource tracking: {e}")
+    
     def _cleanup(self) -> None:
-        """Cleanup resources."""
+        """Cleanup resources including resource manager."""
+        # Stop resource manager
+        if self.resource_manager is not None:
+            try:
+                self.resource_manager.stop()
+            except Exception as e:
+                logger.warning(f"Error stopping resource manager: {e}")
+        
+        # Close logging writers
         if "tensorboard" in self.writers:
             self.writers["tensorboard"].close()
         

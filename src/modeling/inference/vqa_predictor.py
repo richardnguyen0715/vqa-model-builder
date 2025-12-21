@@ -1,6 +1,7 @@
 """
 VQA Predictor Module
 Provides inference engine for Vietnamese VQA models.
+Includes resource monitoring for inference operations.
 """
 
 import logging
@@ -20,6 +21,16 @@ from .inference_config import (
     get_default_inference_config
 )
 
+# Resource management imports
+try:
+    from src.resource_management import (
+        ResourceMonitor,
+        load_resource_config,
+    )
+    RESOURCE_MANAGEMENT_AVAILABLE = True
+except ImportError:
+    RESOURCE_MANAGEMENT_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +47,7 @@ class PredictionResult:
         question: Original question
         attention_weights: Optional attention visualization data
         retrieved_knowledge: Optional retrieved knowledge documents
+        resource_metrics: Optional resource usage during inference
     """
     answer: str
     answer_id: int
@@ -44,6 +56,7 @@ class PredictionResult:
     question: str = ""
     attention_weights: Optional[Dict[str, Any]] = None
     retrieved_knowledge: Optional[List[str]] = None
+    resource_metrics: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -55,10 +68,12 @@ class BatchPredictionResult:
         predictions: List of individual prediction results
         batch_size: Number of predictions
         inference_time: Total inference time in seconds
+        resource_metrics: Optional resource usage during batch inference
     """
     predictions: List[PredictionResult]
     batch_size: int
     inference_time: float = 0.0
+    resource_metrics: Optional[Dict[str, Any]] = None
 
 
 class VQAPredictor:
@@ -70,6 +85,7 @@ class VQAPredictor:
     - Multiple decoding strategies
     - Knowledge-augmented inference
     - Attention visualization
+    - Resource monitoring during inference
     
     Attributes:
         model: VQA model
@@ -78,6 +94,7 @@ class VQAPredictor:
         answer_vocabulary: Answer ID to string mapping
         tokenizer: Text tokenizer
         image_transform: Image transformation pipeline
+        resource_monitor: Optional resource monitor for tracking usage
     """
     
     def __init__(
@@ -86,7 +103,8 @@ class VQAPredictor:
         config: Optional[VQAInferenceConfig] = None,
         answer_vocabulary: Optional[List[str]] = None,
         tokenizer: Any = None,
-        image_transform: Any = None
+        image_transform: Any = None,
+        enable_resource_monitoring: bool = False
     ):
         """
         Initialize VQA predictor.
@@ -97,6 +115,7 @@ class VQAPredictor:
             answer_vocabulary: List of answer strings
             tokenizer: Text tokenizer for questions
             image_transform: Image preprocessing transform
+            enable_resource_monitoring: Enable resource monitoring during inference
         """
         self.config = config or get_default_inference_config()
         self.device = self._get_device()
@@ -124,7 +143,53 @@ class VQAPredictor:
         if image_transform is None:
             self._setup_default_transform()
         
+        # Setup resource monitoring
+        self.resource_monitor = self._setup_resource_monitor(enable_resource_monitoring)
+        
         logger.info(f"Initialized VQA predictor on {self.device}")
+    
+    def _setup_resource_monitor(
+        self,
+        enable: bool = False
+    ) -> Optional["ResourceMonitor"]:
+        """
+        Setup resource monitor for tracking usage during inference.
+        
+        Args:
+            enable: Whether to enable resource monitoring.
+            
+        Returns:
+            ResourceMonitor instance or None if not available.
+        """
+        if not enable or not RESOURCE_MANAGEMENT_AVAILABLE:
+            return None
+        
+        try:
+            resource_config = load_resource_config()
+            monitor = ResourceMonitor(resource_config)
+            logger.info("Resource monitoring enabled for inference")
+            return monitor
+        except Exception as e:
+            logger.warning(f"Failed to setup resource monitor: {e}")
+            return None
+    
+    def _get_resource_snapshot(self) -> Optional[Dict[str, Any]]:
+        """
+        Get current resource usage snapshot.
+        
+        Returns:
+            Dictionary with resource metrics or None if monitoring not available.
+        """
+        if self.resource_monitor is None:
+            return None
+        
+        try:
+            metrics = self.resource_monitor.get_latest_metrics()
+            if metrics is not None:
+                return metrics.to_dict()
+        except Exception:
+            pass
+        return None
     
     def _get_device(self) -> torch.device:
         """Get inference device."""
@@ -388,87 +453,112 @@ class VQAPredictor:
         """
         Predict answers for batch of image-question pairs.
         
+        Tracks resource usage during batch inference if monitoring is enabled.
+        
         Args:
             images: List of input images
             questions: List of question strings
             
         Returns:
-            BatchPredictionResult with all predictions
+            BatchPredictionResult with all predictions and resource metrics
         """
         import time
         start_time = time.time()
         
         assert len(images) == len(questions), "Images and questions must have same length"
         
+        # Start resource monitoring for batch inference
+        if self.resource_monitor is not None:
+            self.resource_monitor.start()
+            initial_resources = self._get_resource_snapshot()
+        else:
+            initial_resources = None
+        
         predictions = []
         batch_size = self.config.inference.batch_size
         
-        # Process in batches
-        for i in range(0, len(images), batch_size):
-            batch_images = images[i:i + batch_size]
-            batch_questions = questions[i:i + batch_size]
-            
-            # Preprocess batch
-            image_tensors = torch.cat([
-                self._preprocess_image(img) for img in batch_images
-            ], dim=0)
-            
-            # Tokenize questions
-            question_inputs = self.tokenizer(
-                batch_questions,
-                max_length=self.config.preprocess.max_question_length,
-                padding="max_length",
-                truncation=True,
-                return_tensors="pt"
-            )
-            question_inputs = {
-                k: v.to(self.device) for k, v in question_inputs.items()
-            }
-            
-            # Inference
-            if self.config.inference.use_fp16 and self.device.type == "cuda":
-                with torch.cuda.amp.autocast():
+        try:
+            # Process in batches
+            for i in range(0, len(images), batch_size):
+                batch_images = images[i:i + batch_size]
+                batch_questions = questions[i:i + batch_size]
+                
+                # Preprocess batch
+                image_tensors = torch.cat([
+                    self._preprocess_image(img) for img in batch_images
+                ], dim=0)
+                
+                # Tokenize questions
+                question_inputs = self.tokenizer(
+                    batch_questions,
+                    max_length=self.config.preprocess.max_question_length,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt"
+                )
+                question_inputs = {
+                    k: v.to(self.device) for k, v in question_inputs.items()
+                }
+                
+                # Inference
+                if self.config.inference.use_fp16 and self.device.type == "cuda":
+                    with torch.cuda.amp.autocast():
+                        outputs = self.model(
+                            image=image_tensors,
+                            input_ids=question_inputs["input_ids"],
+                            attention_mask=question_inputs["attention_mask"]
+                        )
+                else:
                     outputs = self.model(
                         image=image_tensors,
                         input_ids=question_inputs["input_ids"],
                         attention_mask=question_inputs["attention_mask"]
                     )
-            else:
-                outputs = self.model(
-                    image=image_tensors,
-                    input_ids=question_inputs["input_ids"],
-                    attention_mask=question_inputs["attention_mask"]
-                )
-            
-            logits = outputs.logits if hasattr(outputs, "logits") else outputs["logits"]
-            probs = F.softmax(logits, dim=-1)
-            
-            # Process each prediction
-            for j, (q, p) in enumerate(zip(batch_questions, probs)):
-                answer_id = p.argmax().item()
-                confidence = p[answer_id].item()
                 
-                top_n = self.config.answer.return_top_n
-                top_probs, top_ids = p.topk(top_n)
-                top_answers = [
-                    (self._id_to_answer(tid.item()), tp.item())
-                    for tid, tp in zip(top_ids, top_probs)
-                ]
+                logits = outputs.logits if hasattr(outputs, "logits") else outputs["logits"]
+                probs = F.softmax(logits, dim=-1)
                 
-                predictions.append(PredictionResult(
-                    answer=self._id_to_answer(answer_id),
-                    answer_id=answer_id,
-                    confidence=confidence,
-                    top_answers=top_answers,
-                    question=q
-                ))
+                # Process each prediction
+                for j, (q, p) in enumerate(zip(batch_questions, probs)):
+                    answer_id = p.argmax().item()
+                    confidence = p[answer_id].item()
+                    
+                    top_n = self.config.answer.return_top_n
+                    top_probs, top_ids = p.topk(top_n)
+                    top_answers = [
+                        (self._id_to_answer(tid.item()), tp.item())
+                        for tid, tp in zip(top_ids, top_probs)
+                    ]
+                    
+                    predictions.append(PredictionResult(
+                        answer=self._id_to_answer(answer_id),
+                        answer_id=answer_id,
+                        confidence=confidence,
+                        top_answers=top_answers,
+                        question=q
+                    ))
+        finally:
+            # Stop resource monitoring
+            if self.resource_monitor is not None:
+                self.resource_monitor.stop()
         
         inference_time = time.time() - start_time
+        
+        # Collect resource metrics
+        final_resources = self._get_resource_snapshot()
+        resource_metrics = None
+        if initial_resources or final_resources:
+            resource_metrics = {
+                "initial": initial_resources,
+                "final": final_resources,
+                "inference_time": inference_time,
+            }
         
         return BatchPredictionResult(
             predictions=predictions,
             batch_size=len(images),
-            inference_time=inference_time
+            inference_time=inference_time,
+            resource_metrics=resource_metrics
         )
     
     def save_predictions(
@@ -478,6 +568,8 @@ class VQAPredictor:
     ) -> None:
         """
         Save predictions to file.
+        
+        Includes resource metrics if available.
         
         Args:
             results: Prediction results
@@ -493,6 +585,9 @@ class VQAPredictor:
                 "top_answers": results.top_answers,
                 "question": results.question
             }
+            # Add resource metrics if available
+            if results.resource_metrics:
+                data["resource_metrics"] = results.resource_metrics
         else:
             data = {
                 "predictions": [
@@ -508,6 +603,9 @@ class VQAPredictor:
                 "batch_size": results.batch_size,
                 "inference_time": results.inference_time
             }
+            # Add resource metrics if available
+            if results.resource_metrics:
+                data["resource_metrics"] = results.resource_metrics
         
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
