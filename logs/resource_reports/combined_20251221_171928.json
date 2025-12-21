@@ -1,0 +1,96 @@
+{
+  "report_id": "combined_20251221_171928_1",
+  "report_type": "combined",
+  "timestamp": "2025-12-21T17:19:28.840471",
+  "title": "Combined System Status Report",
+  "summary": "Combined system report. ",
+  "data": {
+    "generated_at": "2025-12-21T17:19:28.840456",
+    "resources": {
+      "timestamp": "2025-12-21T17:19:28.840390",
+      "cpu": {
+        "timestamp": "2025-12-21T17:19:28.840162",
+        "resource_type": "cpu",
+        "usage_percent": 0.0,
+        "used_value": 0.0,
+        "total_value": 100.0,
+        "available_value": 100.0,
+        "additional_info": {
+          "cpu_count_physical": 12,
+          "cpu_count_logical": 12,
+          "per_cpu_percent": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "current_mhz": 4,
+          "min_mhz": 1,
+          "max_mhz": 4
+        }
+      },
+      "memory": {
+        "timestamp": "2025-12-21T17:19:28.840176",
+        "resource_type": "memory",
+        "usage_percent": 65.9,
+        "used_value": 14884438016,
+        "total_value": 25769803776,
+        "available_value": 8783593472,
+        "additional_info": {
+          "used_mb": 14194.90625,
+          "total_mb": 24576.0,
+          "available_mb": 8376.6875,
+          "cached_mb": 0.0,
+          "buffers_mb": 0.0,
+          "swap_used_mb": 4079.875,
+          "swap_total_mb": 5120.0,
+          "swap_percent": 79.7
+        }
+      },
+      "gpu": {
+        "timestamp": "2025-12-21T17:19:28.840179",
+        "resource_type": "gpu",
+        "usage_percent": 0.0,
+        "used_value": 0.0,
+        "total_value": 0.0,
+        "available_value": 0.0,
+        "additional_info": {
+          "available": false,
+          "reason": "GPU monitoring not available"
+        }
+      },
+      "disk": {
+        "timestamp": "2025-12-21T17:19:28.840386",
+        "resource_type": "disk",
+        "usage_percent": 3.2,
+        "used_value": 12266635264,
+        "total_value": 494384795648,
+        "available_value": 370822369280,
+        "additional_info": {
+          "monitor_path": "/",
+          "used_gb": 11.4241943359375,
+          "total_gb": 460.4317207336426,
+          "free_gb": 345.3552436828613,
+          "read_bytes": 178936680448,
+          "write_bytes": 195909083136,
+          "read_count": 6484557,
+          "write_count": 5608702
+        }
+      },
+      "alerts": []
+    }
+  },
+  "metadata": {
+    "has_resources": true,
+    "has_tasks": true,
+    "has_additional": false
+  }
+}
