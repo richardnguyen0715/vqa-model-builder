@@ -20,6 +20,12 @@ from .vqa_predictor import (
     load_predictor
 )
 
+from .result_manager import (
+    InferenceResult,
+    InferenceResultManager,
+    save_inference_results
+)
+
 __all__ = [
     # Config enums
     'InferenceMode',
@@ -36,5 +42,10 @@ __all__ = [
     'PredictionResult',
     'BatchPredictionResult',
     'VQAPredictor',
-    'load_predictor'
+    'load_predictor',
+    
+    # Result management
+    'InferenceResult',
+    'InferenceResultManager',
+    'save_inference_results'
 ]

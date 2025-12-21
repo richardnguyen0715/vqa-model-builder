@@ -1,0 +1,82 @@
+# =============================================================================
+# Inference Configuration
+# Configuration for VQA model inference and result saving
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Model Settings
+# -----------------------------------------------------------------------------
+model:
+  checkpoint_path: null           # Path to model checkpoint (required)
+  device: "auto"                  # Device: auto, cuda, cpu, mps
+  use_fp16: false                 # Use FP16 inference for faster speed
+  compile_model: false            # Use torch.compile for optimization
+
+# -----------------------------------------------------------------------------
+# Inference Settings
+# -----------------------------------------------------------------------------
+inference:
+  batch_size: 32                  # Inference batch size
+  num_workers: 4                  # Data loading workers
+  
+  # Top-k predictions
+  top_k: 5                        # Number of top predictions to return
+  return_probabilities: true      # Include prediction probabilities
+  
+  # Confidence threshold
+  confidence_threshold: 0.0       # Minimum confidence for predictions (0.0 = no threshold)
+  
+  # Answer vocabulary
+  answer_vocab_path: null         # Path to answer vocabulary file
+  
+  # Progress display
+  show_progress: true             # Show progress bar during inference
+
+# -----------------------------------------------------------------------------
+# Result Output Settings
+# -----------------------------------------------------------------------------
+output:
+  # Output directory
+  output_dir: "inference_results"
+  
+  # Output format
+  format: "json"                  # Output format: json, csv, jsonl
+  
+  # Filename settings
+  prefix: "inference_results"     # Output filename prefix
+  include_timestamp: true         # Include timestamp in filename
+  timestamp_format: "%Y%m%d_%H%M%S"
+  
+  # What to include in results
+  include_predictions: true       # Include predicted answers
+  include_probabilities: true     # Include prediction probabilities
+  include_top_k: true             # Include top-k predictions
+  include_question: true          # Include original question
+  include_image_path: true        # Include image path
+  include_ground_truth: false     # Include ground truth (if available)
+  include_metadata: true          # Include inference metadata
+  
+  # Sample visualization
+  save_samples: true              # Save sample visualizations
+  num_samples: 10                 # Number of samples to visualize
+  sample_dir: "samples"           # Subdirectory for samples
+
+# -----------------------------------------------------------------------------
+# Evaluation Settings (when ground truth is available)
+# -----------------------------------------------------------------------------
+evaluation:
+  enabled: false                  # Enable evaluation mode
+  metrics: ["accuracy", "f1", "bleu"]  # Metrics to compute
+  save_detailed_results: true     # Save per-sample evaluation results
+  save_confusion_matrix: false    # Save confusion matrix
+  
+  # Result aggregation
+  aggregate_by: null              # Aggregate results by field (e.g., question_type)
+
+# -----------------------------------------------------------------------------
+# Logging Settings
+# -----------------------------------------------------------------------------
+logging:
+  log_level: "INFO"               # Logging level: DEBUG, INFO, WARNING, ERROR
+  log_to_file: true               # Save logs to file
+  log_file: "inference.log"       # Log filename (in output_dir)

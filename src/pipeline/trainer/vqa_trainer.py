@@ -1,10 +1,12 @@
 """
 VQA Trainer Module
 Provides the main trainer class for Vietnamese VQA models.
+Integrates with centralized configuration system and checkpoint management.
 """
 
 import os
 import time
+import signal
 import logging
 from typing import Optional, Dict, Any, Callable, List
 from dataclasses import dataclass
@@ -34,6 +36,8 @@ from .training_utils import (
     save_checkpoint,
     load_checkpoint
 )
+from .checkpoint_manager import CheckpointManager
+from src.middleware.config_loader import get_config, get_config_manager
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +68,9 @@ class VQATrainer:
     - Gradient accumulation
     - Learning rate scheduling
     - Early stopping
-    - Checkpointing
+    - Checkpointing (integrated with CheckpointManager)
     - Logging (TensorBoard, W&B)
+    - Configuration from YAML files
     
     Attributes:
         model: VQA model to train
@@ -75,6 +80,7 @@ class VQATrainer:
         scheduler: Learning rate scheduler
         scaler: Gradient scaler for mixed precision
         early_stopping: Early stopping handler
+        checkpoint_manager: Checkpoint management handler
         state: Current training state
     """
     
@@ -85,24 +91,30 @@ class VQATrainer:
         train_dataloader: Optional[DataLoader] = None,
         val_dataloader: Optional[DataLoader] = None,
         loss_fn: Optional[Callable] = None,
-        metrics_fn: Optional[Callable] = None
+        metrics_fn: Optional[Callable] = None,
+        use_yaml_config: bool = True
     ):
         """
         Initialize trainer.
         
         Args:
             model: VQA model to train
-            config: Training configuration
+            config: Training configuration (overrides YAML if provided)
             train_dataloader: Training data loader
             val_dataloader: Validation data loader
             loss_fn: Loss function (receives model output and targets)
             metrics_fn: Metrics function (receives predictions and targets)
+            use_yaml_config: Whether to load settings from YAML config files
         """
-        self.config = config or get_default_training_config()
+        # Load configuration
+        self.use_yaml_config = use_yaml_config
+        self.config = config or self._load_config_from_yaml() or get_default_training_config()
         self.device = get_device()
         
         # Set seed for reproducibility
-        set_seed(self.config.seed, self.config.deterministic)
+        seed = self._get_training_param("seed", self.config.seed)
+        deterministic = self._get_training_param("deterministic", self.config.deterministic)
+        set_seed(seed, deterministic)
         
         # Setup model
         self.model = model.to(self.device)
@@ -127,10 +139,15 @@ class VQATrainer:
         # Setup early stopping
         self.early_stopping = self._setup_early_stopping()
         
+        # Setup checkpoint manager
+        self.checkpoint_manager = self._setup_checkpoint_manager()
+        
         # Gradient accumulation
-        self.grad_accumulator = GradientAccumulator(
+        grad_accum_steps = self._get_training_param(
+            "gradient_accumulation_steps",
             self.config.gradient_accumulation_steps
         )
+        self.grad_accumulator = GradientAccumulator(grad_accum_steps)
         
         # Progress tracking
         self.train_tracker = ProgressTracker(["loss", "accuracy"])
@@ -142,11 +159,233 @@ class VQATrainer:
         # Logging
         self.writers = self._setup_logging()
         
+        # Setup interrupt handling
+        self._setup_interrupt_handler()
+        
         # Resume from checkpoint if specified
-        if self.config.checkpoint.resume_from:
-            self._resume_from_checkpoint()
+        resume_path = self._get_checkpoint_resume_path()
+        if resume_path:
+            self._resume_from_checkpoint(resume_path)
         
         logger.info(f"Initialized trainer with {count_parameters(self.model):,} trainable parameters")
+    
+    def _load_config_from_yaml(self) -> Optional[TrainingConfig]:
+        """
+        Load training configuration from YAML files.
+        
+        Returns:
+            TrainingConfig instance loaded from YAML, or None if loading fails.
+        """
+        if not self.use_yaml_config:
+            return None
+        
+        try:
+            from .trainer_config import (
+                OptimizerConfig, SchedulerConfig, LossConfig,
+                DataConfig, LoggingConfig, CheckpointConfig, EarlyStoppingConfig
+            )
+            
+            # Load optimizer config
+            opt_cfg = get_config("training", "optimizer", {})
+            optimizer_config = OptimizerConfig(
+                name=opt_cfg.get("name", "adamw"),
+                lr=opt_cfg.get("learning_rate", 1e-4),
+                weight_decay=opt_cfg.get("weight_decay", 0.01),
+                betas=tuple(opt_cfg.get("betas", [0.9, 0.999])),
+                momentum=opt_cfg.get("momentum", 0.9),
+                eps=opt_cfg.get("eps", 1e-8),
+                use_lookahead=opt_cfg.get("use_lookahead", False),
+                lookahead_k=opt_cfg.get("lookahead_k", 5),
+                lookahead_alpha=opt_cfg.get("lookahead_alpha", 0.5)
+            )
+            
+            # Load scheduler config
+            sched_cfg = get_config("training", "scheduler", {})
+            scheduler_config = SchedulerConfig(
+                name=sched_cfg.get("name", "cosine"),
+                warmup_steps=sched_cfg.get("warmup_steps", 0),
+                warmup_ratio=sched_cfg.get("warmup_ratio", 0.1),
+                num_cycles=sched_cfg.get("num_cycles", 1),
+                power=sched_cfg.get("power", 1.0),
+                step_size=sched_cfg.get("step_size", 10),
+                gamma=sched_cfg.get("gamma", 0.1),
+                min_lr=sched_cfg.get("min_lr", 0.0)
+            )
+            
+            # Load loss config
+            loss_cfg = get_config("training", "loss", {})
+            loss_config = LossConfig(
+                classification_loss=loss_cfg.get("classification_loss", "cross_entropy"),
+                classification_weight=loss_cfg.get("classification_weight", 1.0),
+                contrastive_loss=loss_cfg.get("contrastive_loss"),
+                contrastive_weight=loss_cfg.get("contrastive_weight", 0.1),
+                moe_aux_weight=loss_cfg.get("moe_aux_weight", 0.01),
+                rag_aux_weight=loss_cfg.get("rag_aux_weight", 0.1),
+                label_smoothing=loss_cfg.get("label_smoothing", 0.0),
+                focal_gamma=loss_cfg.get("focal_gamma", 2.0),
+                focal_alpha=loss_cfg.get("focal_alpha", 0.25)
+            )
+            
+            # Load data config
+            data_cfg = get_config("training", "data", {})
+            data_config = DataConfig(
+                batch_size=data_cfg.get("batch_size", 32),
+                eval_batch_size=data_cfg.get("eval_batch_size", 64),
+                num_workers=data_cfg.get("num_workers", 4),
+                pin_memory=data_cfg.get("pin_memory", True),
+                drop_last=data_cfg.get("drop_last", True),
+                shuffle=data_cfg.get("shuffle", True),
+                prefetch_factor=data_cfg.get("prefetch_factor", 2)
+            )
+            
+            # Load logging config
+            log_cfg = get_config("training", "logging", {})
+            logging_config = LoggingConfig(
+                log_dir=log_cfg.get("log_dir", "logs"),
+                log_interval=log_cfg.get("log_interval", 100),
+                save_interval=get_config("checkpoint", "save.save_every_k_epochs", 1),
+                eval_interval=log_cfg.get("eval_interval", 1),
+                use_tensorboard=log_cfg.get("use_tensorboard", True),
+                use_wandb=log_cfg.get("use_wandb", False),
+                wandb_project=log_cfg.get("wandb_project", "vietnamese-vqa"),
+                wandb_entity=log_cfg.get("wandb_entity"),
+                wandb_run_name=log_cfg.get("wandb_run_name")
+            )
+            
+            # Load checkpoint config
+            ckpt_cfg = get_config("checkpoint", {})
+            checkpoint_config = CheckpointConfig(
+                save_dir=ckpt_cfg.get("save", {}).get("base_dir", "checkpoints"),
+                save_best=ckpt_cfg.get("save", {}).get("keep_best", True),
+                save_last=True,
+                max_keep=ckpt_cfg.get("save", {}).get("max_keep", 3),
+                metric_for_best=ckpt_cfg.get("best_model", {}).get("metric", "accuracy"),
+                mode=ckpt_cfg.get("best_model", {}).get("mode", "max"),
+                resume_from=ckpt_cfg.get("resume", {}).get("checkpoint_path")
+            )
+            
+            # Load early stopping config
+            es_cfg = get_config("training", "early_stopping", {})
+            early_stopping_config = EarlyStoppingConfig(
+                enabled=es_cfg.get("enabled", True),
+                patience=es_cfg.get("patience", 5),
+                min_delta=es_cfg.get("min_delta", 0.001),
+                metric=es_cfg.get("metric", "val_accuracy"),
+                mode=es_cfg.get("mode", "max")
+            )
+            
+            # Load training params
+            train_cfg = get_config("training", "training", {})
+            
+            # Map string to enum for strategy
+            strategy_map = {
+                "full": TrainingStrategy.FULL,
+                "freeze_visual": TrainingStrategy.FREEZE_VISUAL,
+                "freeze_text": TrainingStrategy.FREEZE_TEXT,
+                "linear_probe": TrainingStrategy.LINEAR_PROBE,
+                "gradual_unfreeze": TrainingStrategy.GRADUAL_UNFREEZE
+            }
+            strategy_str = train_cfg.get("strategy", "full")
+            strategy = strategy_map.get(strategy_str, TrainingStrategy.FULL)
+            
+            # Map string to enum for mixed precision
+            mp_map = {
+                "off": MixedPrecisionMode.OFF,
+                "fp16": MixedPrecisionMode.FP16,
+                "bf16": MixedPrecisionMode.BF16
+            }
+            mp_str = train_cfg.get("mixed_precision", "off")
+            mixed_precision = mp_map.get(mp_str, MixedPrecisionMode.OFF)
+            
+            # Map string to enum for gradient checkpointing
+            gc_map = {
+                "off": GradientCheckpointMode.OFF,
+                "full": GradientCheckpointMode.FULL,
+                "selective": GradientCheckpointMode.SELECTIVE
+            }
+            gc_str = train_cfg.get("gradient_checkpointing", "off")
+            gradient_checkpointing = gc_map.get(gc_str, GradientCheckpointMode.OFF)
+            
+            return TrainingConfig(
+                num_epochs=train_cfg.get("num_epochs", 10),
+                max_steps=train_cfg.get("max_steps"),
+                gradient_accumulation_steps=train_cfg.get("gradient_accumulation_steps", 1),
+                max_grad_norm=train_cfg.get("max_grad_norm", 1.0),
+                strategy=strategy,
+                mixed_precision=mixed_precision,
+                gradient_checkpointing=gradient_checkpointing,
+                compile_model=train_cfg.get("compile_model", False),
+                seed=train_cfg.get("seed", 42),
+                deterministic=train_cfg.get("deterministic", False),
+                optimizer=optimizer_config,
+                scheduler=scheduler_config,
+                loss=loss_config,
+                data=data_config,
+                logging=logging_config,
+                checkpoint=checkpoint_config,
+                early_stopping=early_stopping_config
+            )
+            
+        except Exception as e:
+            logger.warning(f"Failed to load config from YAML: {e}. Using defaults.")
+            return None
+    
+    def _get_training_param(self, key: str, default: Any) -> Any:
+        """
+        Get training parameter from YAML config or use default.
+        
+        Args:
+            key: Configuration key in training.training section.
+            default: Default value if not found.
+            
+        Returns:
+            Configuration value.
+        """
+        if self.use_yaml_config:
+            yaml_value = get_config("training", f"training.{key}")
+            if yaml_value is not None:
+                return yaml_value
+        return default
+    
+    def _get_checkpoint_resume_path(self) -> Optional[str]:
+        """
+        Get checkpoint path for resuming training.
+        
+        Returns:
+            Checkpoint path or None.
+        """
+        # Check config object first
+        if self.config.checkpoint.resume_from:
+            return self.config.checkpoint.resume_from
+        
+        # Check YAML config
+        if self.use_yaml_config:
+            return get_config("checkpoint", "resume.checkpoint_path")
+        
+        return None
+    
+    def _setup_checkpoint_manager(self) -> CheckpointManager:
+        """
+        Setup checkpoint manager for saving and loading checkpoints.
+        
+        Returns:
+            Initialized CheckpointManager instance.
+        """
+        return CheckpointManager(
+            save_dir=self.config.checkpoint.save_dir,
+            max_keep=self.config.checkpoint.max_keep,
+            metric_name=self.config.checkpoint.metric_for_best,
+            metric_mode=self.config.checkpoint.mode
+        )
+    
+    def _setup_interrupt_handler(self) -> None:
+        """Setup handler to save checkpoint on keyboard interrupt."""
+        def interrupt_handler(signum, frame):
+            logger.info("Interrupt received. Saving checkpoint before exit...")
+            self._save_interrupt_checkpoint()
+            raise KeyboardInterrupt("Training interrupted by user")
+        
+        signal.signal(signal.SIGINT, interrupt_handler)
     
     def _setup_gradient_checkpointing(self) -> None:
         """Setup gradient checkpointing if enabled."""
@@ -334,22 +573,67 @@ class VQATrainer:
         
         return writers
     
-    def _resume_from_checkpoint(self) -> None:
-        """Resume training from checkpoint."""
-        path = self.config.checkpoint.resume_from
+    def _resume_from_checkpoint(self, path: str) -> None:
+        """
+        Resume training from checkpoint.
         
-        epoch, step, metrics = load_checkpoint(
-            path,
-            self.model,
-            self.optimizer,
-            self.scheduler,
-            self.early_stopping
-        )
-        
-        self.state.epoch = epoch
-        self.state.global_step = step
-        if metrics:
-            self.state.best_metric = metrics.get(self.config.checkpoint.metric_for_best, 0.0)
+        Args:
+            path: Path to checkpoint file.
+        """
+        # Try using checkpoint manager first
+        try:
+            loaded_state = self.checkpoint_manager.load(
+                checkpoint_path=path,
+                model=self.model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                early_stopping=self.early_stopping
+            )
+            
+            self.state.epoch = loaded_state.get("epoch", 0)
+            self.state.global_step = loaded_state.get("global_step", 0)
+            if loaded_state.get("metrics"):
+                self.state.best_metric = loaded_state["metrics"].get(
+                    self.config.checkpoint.metric_for_best, 0.0
+                )
+            
+            logger.info(f"Resumed from checkpoint: epoch {self.state.epoch}, step {self.state.global_step}")
+            
+        except Exception as e:
+            # Fallback to legacy load function
+            logger.warning(f"CheckpointManager load failed: {e}. Using legacy loader.")
+            epoch, step, metrics = load_checkpoint(
+                path,
+                self.model,
+                self.optimizer,
+                self.scheduler,
+                self.early_stopping
+            )
+            
+            self.state.epoch = epoch
+            self.state.global_step = step
+            if metrics:
+                self.state.best_metric = metrics.get(
+                    self.config.checkpoint.metric_for_best, 0.0
+                )
+    
+    def _save_interrupt_checkpoint(self) -> None:
+        """Save checkpoint when training is interrupted."""
+        try:
+            self.checkpoint_manager.save(
+                model=self.model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                scaler=self.scaler,
+                early_stopping=self.early_stopping,
+                epoch=self.state.epoch,
+                global_step=self.state.global_step,
+                metrics={"accuracy": self.state.best_metric},
+                is_interrupt=True
+            )
+            logger.info("Interrupt checkpoint saved successfully")
+        except Exception as e:
+            logger.error(f"Failed to save interrupt checkpoint: {e}")
     
     def _default_loss_fn(self, outputs: Dict[str, Any], batch: Dict[str, Any]) -> torch.Tensor:
         """Default loss function using cross entropy."""
@@ -613,7 +897,39 @@ class VQATrainer:
             })
     
     def _save_checkpoint(self, is_best: bool = False) -> None:
-        """Save checkpoint."""
+        """
+        Save checkpoint using checkpoint manager.
+        
+        Args:
+            is_best: Whether current model is the best so far.
+        """
+        current_metrics = {self.config.checkpoint.metric_for_best: self.state.best_metric}
+        
+        # Use checkpoint manager for saving
+        try:
+            self.checkpoint_manager.save(
+                model=self.model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                scaler=self.scaler,
+                early_stopping=self.early_stopping,
+                epoch=self.state.epoch,
+                global_step=self.state.global_step,
+                metrics=current_metrics,
+                is_best=is_best
+            )
+            
+        except Exception as e:
+            logger.error(f"CheckpointManager save failed: {e}. Using fallback save.")
+            self._fallback_save_checkpoint(is_best)
+    
+    def _fallback_save_checkpoint(self, is_best: bool = False) -> None:
+        """
+        Fallback checkpoint saving using legacy function.
+        
+        Args:
+            is_best: Whether current model is the best so far.
+        """
         ckpt_config = self.config.checkpoint
         
         # Save last checkpoint
@@ -645,7 +961,13 @@ class VQATrainer:
             )
         
         # Save periodic checkpoint
-        if self.state.epoch % ckpt_config.save_interval == 0:
+        save_interval = get_config(
+            "checkpoint", 
+            "save.save_every_k_epochs",
+            ckpt_config.save_interval
+        ) if self.use_yaml_config else ckpt_config.save_interval
+        
+        if self.state.epoch % save_interval == 0:
             path = os.path.join(ckpt_config.save_dir, f"epoch_{self.state.epoch}.pt")
             save_checkpoint(
                 self.model,

@@ -1,0 +1,104 @@
+# =============================================================================
+# Training Configuration
+# Configuration for VQA model training pipeline
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Optimizer Configuration
+# -----------------------------------------------------------------------------
+optimizer:
+  name: "adamw"                    # Optimizer type: adam, adamw, sgd, lamb
+  learning_rate: 2.0e-5            # Base learning rate
+  weight_decay: 0.01               # L2 regularization weight
+  betas: [0.9, 0.999]              # Adam beta parameters
+  momentum: 0.9                    # SGD momentum (used only for sgd)
+  eps: 1.0e-8                      # Epsilon for numerical stability
+  
+  # Lookahead wrapper settings
+  use_lookahead: true
+  lookahead_k: 5                   # Lookahead update frequency
+  lookahead_alpha: 0.5             # Lookahead interpolation coefficient
+
+# -----------------------------------------------------------------------------
+# Learning Rate Scheduler Configuration
+# -----------------------------------------------------------------------------
+scheduler:
+  name: "cosine"                   # Scheduler type: cosine, linear, polynomial, step
+  warmup_steps: 0                  # Number of warmup steps (overrides warmup_ratio if > 0)
+  warmup_ratio: 0.1                # Warmup ratio of total training steps
+  num_cycles: 1                    # Number of cycles for cosine scheduler
+  power: 1.0                       # Power for polynomial scheduler
+  step_size: 10                    # Step size for step scheduler
+  gamma: 0.1                       # Gamma for step scheduler
+  min_lr: 1.0e-7                   # Minimum learning rate
+
+# -----------------------------------------------------------------------------
+# Loss Function Configuration
+# -----------------------------------------------------------------------------
+loss:
+  classification_loss: "label_smoothing"  # Loss type: cross_entropy, focal, label_smoothing
+  classification_weight: 1.0              # Weight for classification loss
+  contrastive_loss: null                  # Optional: triplet, infonce
+  contrastive_weight: 0.1                 # Weight for contrastive loss
+  moe_aux_weight: 0.01                    # Weight for MOE auxiliary loss
+  rag_aux_weight: 0.1                     # Weight for RAG auxiliary loss
+  label_smoothing: 0.1                    # Label smoothing factor
+  focal_gamma: 2.0                        # Focal loss gamma
+  focal_alpha: 0.25                       # Focal loss alpha
+
+# -----------------------------------------------------------------------------
+# Training Loop Configuration
+# -----------------------------------------------------------------------------
+training:
+  num_epochs: 20                   # Total training epochs
+  gradient_accumulation_steps: 2  # Gradient accumulation steps
+  max_grad_norm: 1.0              # Maximum gradient norm for clipping
+  seed: 42                        # Random seed for reproducibility
+  deterministic: false            # Use deterministic algorithms
+  
+  # Training strategy
+  strategy: "gradual_unfreeze"    # Strategy: full, freeze_visual, freeze_text, linear_probe, gradual_unfreeze
+  
+  # Mixed precision settings
+  mixed_precision: "fp16"         # Mixed precision mode: off, fp16, bf16
+  
+  # Gradient checkpointing
+  gradient_checkpointing: "off"   # Checkpointing mode: off, full, selective
+  
+  # Model compilation (PyTorch 2.0+)
+  compile_model: false            # Enable torch.compile
+
+# -----------------------------------------------------------------------------
+# Early Stopping Configuration
+# -----------------------------------------------------------------------------
+early_stopping:
+  enabled: true
+  patience: 5                     # Epochs without improvement before stopping
+  min_delta: 0.001                # Minimum change to qualify as improvement
+  metric: "accuracy"              # Metric to monitor
+  mode: "max"                     # Mode: max (maximize metric), min (minimize metric)
+
+# -----------------------------------------------------------------------------
+# Data Loading Configuration
+# -----------------------------------------------------------------------------
+data:
+  batch_size: 16                  # Training batch size
+  eval_batch_size: 32             # Evaluation batch size
+  num_workers: 4                  # Number of data loading workers
+  pin_memory: true                # Pin memory for faster GPU transfer
+  drop_last: true                 # Drop incomplete last batch
+  shuffle: true                   # Shuffle training data
+  prefetch_factor: 2              # Prefetch factor for data loading
+
+# -----------------------------------------------------------------------------
+# Logging Configuration
+# -----------------------------------------------------------------------------
+logging:
+  log_dir: "logs"                 # Directory for logs
+  log_interval: 50                # Logging interval in steps
+  eval_interval: 1                # Evaluation interval in epochs
+  use_tensorboard: true           # Enable TensorBoard logging
+  use_wandb: false                # Enable Weights & Biases logging
+  wandb_project: "vietnamese-vqa" # W&B project name
+  wandb_entity: null              # W&B entity name
+  wandb_run_name: null            # W&B run name

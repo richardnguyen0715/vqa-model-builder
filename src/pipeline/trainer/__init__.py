@@ -35,6 +35,8 @@ from .training_utils import (
     load_checkpoint
 )
 
+from .checkpoint_manager import CheckpointManager
+
 from .vqa_trainer import (
     TrainingState,
     VQATrainer,
@@ -73,6 +75,9 @@ __all__ = [
     'clip_gradients',
     'save_checkpoint',
     'load_checkpoint',
+    
+    # Checkpoint Manager
+    'CheckpointManager',
     
     # Trainer
     'TrainingState',
