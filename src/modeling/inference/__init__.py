@@ -21,7 +21,6 @@ from .vqa_predictor import (
 )
 
 from .result_manager import (
-    InferenceResult,
     InferenceResultManager,
     save_inference_results
 )
@@ -45,7 +44,6 @@ __all__ = [
     'load_predictor',
     
     # Result management
-    'InferenceResult',
     'InferenceResultManager',
     'save_inference_results'
 ]
