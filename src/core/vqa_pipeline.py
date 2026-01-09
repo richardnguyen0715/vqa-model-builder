@@ -342,7 +342,9 @@ class VQAPipeline:
             logger=self.logger,
             device=self.model_output.device,
             model_config=self.model_output.config,
-            vocabulary=self.data_output.answer2id
+            vocabulary=self.data_output.answer2id,
+            id2answer=self.data_output.id2answer,
+            num_samples_to_display=5
         )
         
         self.training_output = self.training_pipeline.run()
@@ -369,10 +371,12 @@ class VQAPipeline:
             val_loader=self.data_output.val_loader,
             config=self.config.training,
             logger=self.logger,
-            device=self.model_output.device
+            device=self.model_output.device,
+            id2answer=self.data_output.id2answer,
+            num_samples_to_display=10  # Show more samples in evaluation mode
         )
         
-        metrics = eval_pipeline._validate_epoch()
+        metrics = eval_pipeline._validate_epoch(show_samples=True)
         
         self.logger.success("Evaluation completed")
         self.logger.log_metrics(metrics)

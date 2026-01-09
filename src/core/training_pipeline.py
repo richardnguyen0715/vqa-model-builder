@@ -106,7 +106,9 @@ class TrainingPipeline:
         logger: Optional[PipelineLogger] = None,
         device: Optional[torch.device] = None,
         model_config: Optional[Any] = None,
-        vocabulary: Optional[Dict[str, int]] = None
+        vocabulary: Optional[Dict[str, int]] = None,
+        id2answer: Optional[Dict[int, str]] = None,
+        num_samples_to_display: int = 5
     ):
         """
         Initialize training pipeline.
@@ -120,6 +122,8 @@ class TrainingPipeline:
             device: Training device
             model_config: Model configuration (for saving in checkpoint)
             vocabulary: Answer vocabulary (for saving in checkpoint)
+            id2answer: Mapping from answer ID to answer text (for displaying predictions)
+            num_samples_to_display: Number of sample predictions to display during validation
         """
         self.model = model
         self.train_loader = train_loader
@@ -128,6 +132,8 @@ class TrainingPipeline:
         self.logger = logger or get_pipeline_logger()
         self.model_config = model_config
         self.vocabulary = vocabulary
+        self.id2answer = id2answer or {}
+        self.num_samples_to_display = num_samples_to_display
         
         # Device
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -527,8 +533,15 @@ class TrainingPipeline:
             'learning_rate': self.optimizer.param_groups[0]['lr']
         }
         
-    def _validate_epoch(self) -> Dict[str, float]:
-        """Validate for one epoch."""
+    def _validate_epoch(self, show_samples: bool = True) -> Dict[str, float]:
+        """Validate for one epoch.
+        
+        Args:
+            show_samples: Whether to display sample predictions
+            
+        Returns:
+            Dictionary of validation metrics
+        """
         self.model.eval()
         
         total_loss = 0.0
@@ -538,20 +551,29 @@ class TrainingPipeline:
         all_predictions = []
         all_labels = []
         
+        # Store sample predictions for display (separate correct and incorrect)
+        correct_samples = []
+        incorrect_samples = []
+        max_samples_each = self.num_samples_to_display // 2 + 1
+        
         progress_bar = tqdm(self.val_loader, desc=f"Epoch {self.current_epoch} [Val]")
         
         with torch.no_grad():
             for step, batch in enumerate(progress_bar):
-                # Move batch to device
-                batch = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
-                        for k, v in batch.items()}
+                # Extract non-tensor data before moving to device
+                questions = batch.get('question', [])
+                ground_truths = batch.get('ground_truth', [])
+                
+                # Move batch to device (only tensors)
+                batch_tensors = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                                for k, v in batch.items()}
                 
                 # Forward pass
                 outputs = self.model(
-                    pixel_values=batch['image'],
-                    input_ids=batch['input_ids'],
-                    attention_mask=batch['attention_mask'],
-                    labels=batch['label']
+                    pixel_values=batch_tensors['image'],
+                    input_ids=batch_tensors['input_ids'],
+                    attention_mask=batch_tensors['attention_mask'],
+                    labels=batch_tensors['label']
                 )
                 
                 loss = outputs.loss
@@ -559,11 +581,70 @@ class TrainingPipeline:
                 
                 if hasattr(outputs, 'logits'):
                     predictions = outputs.logits.argmax(dim=-1)
-                    total_correct += (predictions == batch['label']).sum().item()
-                    total_samples += batch['label'].size(0)
+                    total_correct += (predictions == batch_tensors['label']).sum().item()
+                    total_samples += batch_tensors['label'].size(0)
                     
-                    all_predictions.extend(predictions.cpu().tolist())
-                    all_labels.extend(batch['label'].cpu().tolist())
+                    pred_ids = predictions.cpu().tolist()
+                    label_ids = batch_tensors['label'].cpu().tolist()
+                    
+                    all_predictions.extend(pred_ids)
+                    all_labels.extend(label_ids)
+                    
+                    # Collect sample predictions - try to get diverse samples (correct & incorrect)
+                    if show_samples and self.id2answer:
+                        for i in range(len(pred_ids)):
+                            question = questions[i] if i < len(questions) else "N/A"
+                            ground_truth = ground_truths[i] if i < len(ground_truths) else "N/A"
+                            pred_answer = self.id2answer.get(pred_ids[i], f"<ID:{pred_ids[i]}>")
+                            is_correct = pred_ids[i] == label_ids[i]
+                            
+                            # Mark if ground truth is not in vocabulary
+                            gt_in_vocab = label_ids[i] != 0 or ground_truth == "<unk>"
+                            
+                            sample = {
+                                'question': question,
+                                'predicted': pred_answer,
+                                'ground_truth': ground_truth,
+                                'correct': is_correct,
+                                'gt_in_vocab': gt_in_vocab
+                            }
+                            
+                            # Prioritize samples where ground truth IS in vocabulary (more meaningful)
+                            if label_ids[i] != 0:  # ground truth is in vocabulary
+                                if is_correct and len(correct_samples) < max_samples_each:
+                                    correct_samples.append(sample)
+                                elif not is_correct and len(incorrect_samples) < max_samples_each:
+                                    incorrect_samples.append(sample)
+                            
+                            # Stop collecting if we have enough of both
+                            if len(correct_samples) >= max_samples_each and len(incorrect_samples) >= max_samples_each:
+                                break
+                        
+                        # If we don't have enough samples with ground truth in vocab, 
+                        # also collect some with <unk> ground truth
+                        if len(correct_samples) + len(incorrect_samples) < self.num_samples_to_display:
+                            for i in range(len(pred_ids)):
+                                if label_ids[i] == 0:  # ground truth is <unk>
+                                    question = questions[i] if i < len(questions) else "N/A"
+                                    ground_truth = ground_truths[i] if i < len(ground_truths) else "N/A"
+                                    pred_answer = self.id2answer.get(pred_ids[i], f"<ID:{pred_ids[i]}>")
+                                    is_correct = pred_ids[i] == label_ids[i]
+                                    
+                                    sample = {
+                                        'question': question,
+                                        'predicted': pred_answer,
+                                        'ground_truth': f"{ground_truth} (ngoài vocab)",
+                                        'correct': is_correct,
+                                        'gt_in_vocab': False
+                                    }
+                                    
+                                    if is_correct and len(correct_samples) < max_samples_each:
+                                        correct_samples.append(sample)
+                                    elif not is_correct and len(incorrect_samples) < max_samples_each:
+                                        incorrect_samples.append(sample)
+                                    
+                                    if len(correct_samples) + len(incorrect_samples) >= self.num_samples_to_display:
+                                        break
                     
                 # Update progress bar
                 steps_done = step + 1
@@ -575,6 +656,12 @@ class TrainingPipeline:
         avg_loss = total_loss / len(self.val_loader)
         accuracy = total_correct / total_samples if total_samples > 0 else 0
         
+        # Display sample predictions (mix of correct and incorrect)
+        if show_samples and (correct_samples or incorrect_samples):
+            # Combine samples: show some correct, then some incorrect
+            combined_samples = correct_samples[:max_samples_each] + incorrect_samples[:max_samples_each]
+            self._display_sample_predictions(combined_samples[:self.num_samples_to_display])
+        
         # Additional metrics
         metrics = {
             'loss': avg_loss,
@@ -582,6 +669,24 @@ class TrainingPipeline:
         }
         
         return metrics
+    
+    def _display_sample_predictions(self, samples: List[Dict]):
+        """Display sample predictions in a formatted way."""
+        self.logger.info("")
+        self.logger.subsection("Sample Predictions")
+        
+        for i, sample in enumerate(samples, 1):
+            status = "✓" if sample['correct'] else "✗"
+            self.logger.info(f"")
+            self.logger.info(f"  [{status}] Sample {i}:")
+            self.logger.info(f"      Câu hỏi: \"{sample['question']}\"")
+            self.logger.info(f"      Mô hình trả lời: \"{sample['predicted']}\"")
+            self.logger.info(f"      Đáp án đúng: \"{sample['ground_truth']}\"")
+        
+        correct_count = sum(1 for s in samples if s['correct'])
+        self.logger.info(f"")
+        self.logger.info(f"  Sample accuracy: {correct_count}/{len(samples)}")
+        self.logger.info("")
         
     def _save_checkpoint(self, is_best: bool, metrics: Dict[str, float]):
         """Save model checkpoint."""

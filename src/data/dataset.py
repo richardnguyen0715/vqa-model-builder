@@ -137,11 +137,23 @@ class VQADataset(Dataset):
             # Dùng LongTensor cho CrossEntropyLoss
             label_tensor = torch.tensor(label_id, dtype=torch.long) 
             
+        # Get ground truth answer text for evaluation display
+        ground_truth_answer = ""
+        if self.mode == 'train' or self.mode == 'val' or self.mode == 'test':
+            if isinstance(item, OneSample):
+                answers = item.answers
+            else:
+                answers = item.get('answers', [])
+            if answers:
+                ground_truth_answer = Counter(answers).most_common(1)[0][0]
+            
         return {
             'image': image,
             'input_ids': tokenized['input_ids'],
             'attention_mask': tokenized['attention_mask'],
-            'label': label_tensor
+            'label': label_tensor,
+            'question': question,
+            'ground_truth': ground_truth_answer
         }
 
 # --- Helper Function: Xây dựng từ điển câu trả lời ---
