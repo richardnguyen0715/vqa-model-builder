@@ -55,6 +55,9 @@ class DataPipelineConfig:
     # Validation
     validate_samples: int = 5  # Number of samples to log for validation
     
+    # Reproducibility
+    seed: int = 42
+    
 
 @dataclass
 class DataPipelineOutput:
@@ -313,12 +316,14 @@ class DataPipeline:
         self.logger.key_value("Train ratio", self.config.train_ratio)
         self.logger.key_value("Validation ratio", self.config.val_ratio)
         self.logger.key_value("Test ratio", self.config.test_ratio)
+        self.logger.key_value("Seed", self.config.seed)
         
         self.train_data, self.val_data, self.test_data = split_data(
             self.raw_data,
             train_ratio=self.config.train_ratio,
             val_ratio=self.config.val_ratio,
-            is_random=True
+            is_random=True,
+            seed=self.config.seed
         )
         
         self.logger.success("Data split completed:")

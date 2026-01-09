@@ -516,8 +516,8 @@ class ModelPipeline:
             
         self.logger.key_value("Checkpoint path", checkpoint_path)
         
-        # Load checkpoint
-        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        # Load checkpoint (weights_only=False for PyTorch 2.6+ compatibility with custom classes)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         
         # Log checkpoint info
         self.logger.info("Checkpoint contents:")
@@ -526,8 +526,43 @@ class ModelPipeline:
                 self.logger.key_value(key, f"{len(checkpoint[key])} parameters")
             elif key == 'optimizer_state_dict':
                 self.logger.key_value(key, "present")
+            elif key == 'vocabulary':
+                self.logger.key_value(key, f"{len(checkpoint[key])} classes" if checkpoint[key] else "None")
             else:
                 self.logger.key_value(key, checkpoint[key])
+        
+        # Check if num_answers from checkpoint differs from current config
+        # Try to get num_answers from checkpoint or infer from model state dict
+        checkpoint_num_answers = checkpoint.get('num_answers')
+        if checkpoint_num_answers is None:
+            # Infer from model state dict (answer_head final output layer)
+            # The final layer bias shape gives us the number of classes
+            model_state = checkpoint.get('model_state_dict', {})
+            # Find the last layer in answer_head (highest numbered layer with bias)
+            answer_head_biases = {}
+            for key, value in model_state.items():
+                if 'answer_head' in key and '.bias' in key:
+                    # Extract layer number from key like "answer_head.classifier.6.bias"
+                    try:
+                        parts = key.split('.')
+                        for i, part in enumerate(parts):
+                            if part.isdigit():
+                                layer_num = int(part)
+                                answer_head_biases[layer_num] = value.shape[0]
+                    except:
+                        pass
+            
+            if answer_head_biases:
+                # Get the highest layer number (final output layer)
+                final_layer_num = max(answer_head_biases.keys())
+                checkpoint_num_answers = answer_head_biases[final_layer_num]
+                self.logger.info(f"Inferred num_answers={checkpoint_num_answers} from checkpoint model state (layer {final_layer_num})")
+        
+        if checkpoint_num_answers is not None and checkpoint_num_answers != self.config.num_answers:
+            self.logger.warning(f"Checkpoint has {checkpoint_num_answers} classes, current config has {self.config.num_answers}")
+            self.logger.info(f"Rebuilding model with {checkpoint_num_answers} classes from checkpoint")
+            self.config.num_answers = checkpoint_num_answers
+            self.model = None  # Force rebuild
                 
         # Load model state
         if self.model is None:

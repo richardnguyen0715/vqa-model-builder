@@ -104,7 +104,9 @@ class TrainingPipeline:
         val_loader: DataLoader,
         config: Optional[TrainingPipelineConfig] = None,
         logger: Optional[PipelineLogger] = None,
-        device: Optional[torch.device] = None
+        device: Optional[torch.device] = None,
+        model_config: Optional[Any] = None,
+        vocabulary: Optional[Dict[str, int]] = None
     ):
         """
         Initialize training pipeline.
@@ -116,12 +118,16 @@ class TrainingPipeline:
             config: Training pipeline configuration
             logger: Pipeline logger instance
             device: Training device
+            model_config: Model configuration (for saving in checkpoint)
+            vocabulary: Answer vocabulary (for saving in checkpoint)
         """
         self.model = model
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.config = config or TrainingPipelineConfig()
         self.logger = logger or get_pipeline_logger()
+        self.model_config = model_config
+        self.vocabulary = vocabulary
         
         # Device
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -590,7 +596,10 @@ class TrainingPipeline:
             'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
             'best_metric': self.best_metric,
             'metrics': metrics,
-            'config': self.config
+            'config': self.config,
+            'model_config': self.model_config,
+            'vocabulary': self.vocabulary,
+            'num_answers': len(self.vocabulary) if self.vocabulary else None
         }
         
         # Save latest

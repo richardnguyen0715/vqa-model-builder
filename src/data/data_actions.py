@@ -171,7 +171,7 @@ def validate_data(raw_data):
             raise ValueError(f"Sample {i} has empty answers.")
         
         
-def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True):
+def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True, seed=42):
     """Split raw data into training, validation, and test sets.
 
     Args:
@@ -179,12 +179,14 @@ def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True):
         train_ratio: Proportion of data to use for training.
         val_ratio: Proportion of data to use for validation.
         is_random: Whether to shuffle data before splitting.
+        seed: Random seed for reproducibility.
     Returns:
         Tuple of (train_data, val_data, test_data).
     """
     total_samples = len(raw_data)
     if is_random:
         import random
+        random.seed(seed)
         random.shuffle(raw_data)
 
     train_end = int(total_samples * train_ratio)
@@ -194,7 +196,7 @@ def split_data(raw_data, train_ratio=0.8, val_ratio=0.1, is_random=True):
     val_data = raw_data[train_end:val_end]
     test_data = raw_data[val_end:]
 
-    data_process_logger.info(f"Data split into {len(train_data)} training, {len(val_data)} validation, and {len(test_data)} test samples. IS_RANDOM={is_random}")
+    data_process_logger.info(f"Data split into {len(train_data)} training, {len(val_data)} validation, and {len(test_data)} test samples. IS_RANDOM={is_random}, SEED={seed}")
     return train_data, val_data, test_data
 
 

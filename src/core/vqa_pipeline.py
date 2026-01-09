@@ -340,7 +340,9 @@ class VQAPipeline:
             val_loader=self.data_output.val_loader,
             config=self.config.training,
             logger=self.logger,
-            device=self.model_output.device
+            device=self.model_output.device,
+            model_config=self.model_output.config,
+            vocabulary=self.data_output.answer2id
         )
         
         self.training_output = self.training_pipeline.run()
@@ -501,6 +503,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=20)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
     parser.add_argument("--output-dir", type=str, default="outputs")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     
     # Resume
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from")
@@ -516,7 +519,8 @@ def main():
             data=DataPipelineConfig(
                 images_dir=args.images_dir,
                 text_file=args.text_file,
-                batch_size=args.batch_size
+                batch_size=args.batch_size,
+                seed=args.seed
             ),
             model=ModelPipelineConfig(
                 visual_backbone=args.visual_backbone,
@@ -526,7 +530,8 @@ def main():
             ),
             training=TrainingPipelineConfig(
                 num_epochs=args.epochs,
-                learning_rate=args.learning_rate
+                learning_rate=args.learning_rate,
+                seed=args.seed
             ),
             output_dir=args.output_dir,
             resume_from=args.resume
