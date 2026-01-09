@@ -1,0 +1,142 @@
+{
+  "report_id": "emergency_20260109_224711_3",
+  "report_type": "emergency",
+  "timestamp": "2026-01-09T22:47:11.925991",
+  "title": "EMERGENCY REPORT",
+  "summary": "Emergency report generated: Threshold breach shutdown",
+  "data": {
+    "reason": "Threshold breach shutdown",
+    "emergency_time": "2026-01-09T22:47:11.925956",
+    "resources": {
+      "timestamp": "2026-01-09T22:47:06.934466",
+      "cpu": {
+        "timestamp": "2026-01-09T22:47:06.928810",
+        "resource_type": "cpu",
+        "usage_percent": 0.0,
+        "used_value": 0.0,
+        "total_value": 100.0,
+        "available_value": 100.0,
+        "additional_info": {
+          "cpu_count_physical": 20,
+          "cpu_count_logical": 20,
+          "per_cpu_percent": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "current_mhz": 3950.0366000000004,
+          "min_mhz": 800.0,
+          "max_mhz": 4480.0
+        }
+      },
+      "memory": {
+        "timestamp": "2026-01-09T22:47:06.929405",
+        "resource_type": "memory",
+        "usage_percent": 29.1,
+        "used_value": 9704292352,
+        "total_value": 33382240256,
+        "available_value": 23677947904,
+        "additional_info": {
+          "used_mb": 9254.734375,
+          "total_mb": 31835.78515625,
+          "available_mb": 22581.05078125,
+          "cached_mb": 10041.35546875,
+          "buffers_mb": 232.51953125,
+          "swap_used_mb": 0.0,
+          "swap_total_mb": 8191.99609375,
+          "swap_percent": 0.0
+        }
+      },
+      "gpu": {
+        "timestamp": "2026-01-09T22:47:06.929577",
+        "resource_type": "gpu",
+        "usage_percent": 55.759175618489586,
+        "used_value": 7184515072,
+        "total_value": 12884901888,
+        "available_value": 5700386816,
+        "additional_info": {
+          "device_index": 0,
+          "device_name": "NVIDIA GeForce RTX 3060",
+          "used_mb": 6851.6875,
+          "total_mb": 12288.0,
+          "free_mb": 5436.3125,
+          "gpu_utilization_percent": 78,
+          "memory_utilization_percent": 4,
+          "temperature_celsius": 47,
+          "power_watts": 25.82
+        }
+      },
+      "disk": {
+        "timestamp": "2026-01-09T22:47:06.934456",
+        "resource_type": "disk",
+        "usage_percent": 75.5,
+        "used_value": 55959474176,
+        "total_value": 78151184384,
+        "available_value": 18174930944,
+        "additional_info": {
+          "monitor_path": "/",
+          "used_gb": 52.1163215637207,
+          "total_gb": 72.78396224975586,
+          "free_gb": 16.92672348022461,
+          "read_bytes": 2930637824,
+          "write_bytes": 10449328128,
+          "read_count": 62740,
+          "write_count": 123531
+        }
+      },
+      "alerts": []
+    },
+    "alerts": [],
+    "tasks": {
+      "task_1_1767973627": {
+        "task_id": "task_1_1767973627",
+        "name": "VQA Training",
+        "status": "completed",
+        "priority": "high",
+        "total_steps": 1260,
+        "current_step": 1260,
+        "start_time": "2026-01-09T22:47:07.042763",
+        "end_time": "2026-01-09T22:47:09.230201",
+        "estimated_completion": null,
+        "progress_percent": 100.0,
+        "metadata": {
+          "batch_size": 16,
+          "learning_rate": 2e-05,
+          "model_params": 773131960,
+          "mixed_precision": "fp16",
+          "task_type": "training",
+          "total_epochs": 20,
+          "steps_per_epoch": 63,
+          "current_epoch": 0,
+          "final_metrics": {
+            "accuracy": 0.0,
+            "best_epoch": 0
+          },
+          "total_duration_seconds": 2.187438
+        },
+        "error_message": null
+      }
+    }
+  },
+  "metadata": {
+    "severity": "critical",
+    "requires_attention": true
+  }
+}

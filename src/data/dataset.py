@@ -71,14 +71,16 @@ class VQADataset(Dataset):
         image = None
         
         if isinstance(item, OneSample):
-            # Nếu là OneSample, image đã được load sẵn dưới dạng numpy array (BGR do cv2)
-            # Cần convert sang PIL Image (RGB) để tương thích với transforms
-            if isinstance(item.image, np.ndarray):
-                # CV2 load ảnh BGR, convert sang RGB
-                image = Image.fromarray(cv2.cvtColor(item.image, cv2.COLOR_BGR2RGB))
-            else:
-                # Fallback nếu image không phải numpy array (hiếm gặp nếu dùng đúng data_utils)
-                image = item.image
+            # OneSample now stores image_path instead of loaded image for memory efficiency
+            # Load image on-the-fly from path
+            img_path = item.image_path
+            try:
+                # Load image using PIL (RGB format)
+                image = Image.open(img_path).convert('RGB')
+            except Exception as e:
+                data_process_logger.warning(f"Failed to load image {img_path}: {e}")
+                # Create black placeholder image
+                image = Image.new('RGB', (224, 224), (0, 0, 0))
         else:
             # Nếu là dict (từ json cũ)
             img_filename = item.get('image')

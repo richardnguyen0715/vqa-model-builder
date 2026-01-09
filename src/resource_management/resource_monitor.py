@@ -508,9 +508,12 @@ class GPUMonitor(BaseResourceMonitor):
     
     def _initialize_gpu_monitoring(self) -> None:
         """Initialize GPU monitoring backend."""
-        # Try pynvml first
+        # Try nvidia-ml-py (pynvml) first - suppress deprecation warning
         try:
-            import pynvml
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=FutureWarning)
+                import pynvml
             pynvml.nvmlInit()
             self._nvml_initialized = True
             self._pynvml = pynvml

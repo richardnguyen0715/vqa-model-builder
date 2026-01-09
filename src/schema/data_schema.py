@@ -6,7 +6,7 @@ class OneSample(BaseModel):
     """Data structure for a single data sample."""
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
-    image: np.ndarray
+    image_path: str  # Store path instead of loaded image for memory efficiency
     question: str
     answers: List[str]
     metadata: Optional[dict] = None

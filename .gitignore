@@ -218,3 +218,9 @@ __marimo__/
 *.jpeg
 *.jpg
 *.png
+
+# Logs
+logs/
+
+# Models
+checkpoints/

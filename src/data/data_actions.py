@@ -123,14 +123,13 @@ def load_raw_data(images_dir: str, text_file_path: str) -> List[OneSample]:
             # Find corresponding image
             if image_filename in image_path_map:
                 image_path = image_path_map[image_filename]
-                image = load_image(image_path)
+                # Don't load image here - just store path for memory efficiency
 
                 sample = OneSample(
-                    image=image,
+                    image_path=image_path,  # Store path instead of loaded image
                     question=question,
                     answers=answers,
                     metadata={
-                        "image_path": image_path,
                         "answer_count": len(answers)
                     }
                 )
@@ -286,14 +285,13 @@ def load_data_split(images_dir: str, text_file_path: str, split_type: str = 'tra
             # Find corresponding image
             if image_filename in image_path_map:
                 image_path = image_path_map[image_filename]
-                image = load_image(image_path)
+                # Don't load image here - just store path for memory efficiency
 
                 sample = OneSample(
-                    image=image,
+                    image_path=image_path,  # Store path instead of loaded image
                     question=question,
                     answers=answers,
                     metadata={
-                        "image_path": image_path,
                         "answer_count": len(answers)
                     }
                 )

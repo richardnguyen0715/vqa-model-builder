@@ -1209,17 +1209,18 @@ referencing = ">=0.31.0"
 
 [[package]]
 name = "kagglehub"
-version = "0.3.13"
+version = "0.4.0"
 description = "Access Kaggle resources anywhere"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "kagglehub-0.3.13-py3-none-any.whl", hash = "sha256:e00dec8b81396cbad9c7b5eb62a33cf8ae27da26227abd196ed8f054c845ca00"},
-    {file = "kagglehub-0.3.13.tar.gz", hash = "sha256:d3c8b6250627d665096cd91a9487559bf5ed61be607eaf63d14511b20eea646e"},
+    {file = "kagglehub-0.4.0-py3-none-any.whl", hash = "sha256:1ba266dd87fe4934eb4de1a2ecfd10cc190228733e6d7852c04ba899adb02c67"},
+    {file = "kagglehub-0.4.0.tar.gz", hash = "sha256:abed91c5b4736996f242f9ca4fc3bdf4d97b11c8b5a0a636ffb02db219a11b12"},
 ]
 
 [package.dependencies]
+kagglesdk = ">=0.1.14,<1.0"
 packaging = "*"
 pyyaml = "*"
 requests = "*"
@@ -1230,6 +1231,22 @@ hf-datasets = ["datasets", "pandas"]
 pandas-datasets = ["pandas"]
 polars-datasets = ["polars"]
 signing = ["betterproto (>=2.0.0b6)", "model-signing", "sigstore (>=3.6.1)"]
+
+[[package]]
+name = "kagglesdk"
+version = "0.1.14"
+description = "Bindings to access kaggle's external-facing APIs"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "kagglesdk-0.1.14-py3-none-any.whl", hash = "sha256:a06feff062d8a1344ca7d378bfccdee4fd6b0b1b4e236fdafe23fefb730ee17f"},
+    {file = "kagglesdk-0.1.14.tar.gz", hash = "sha256:ac37d7d7fcb9cf92d37319ec65b433686ca5c2f0f28a434a1104855a5f9c24cc"},
+]
+
+[package.dependencies]
+protobuf = "*"
+requests = "*"
 
 [[package]]
 name = "kiwisolver"
@@ -5002,4 +5019,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11, <3.15"
-content-hash = "c9105248ad8d0c5f6639f9cf7e9e23a86171128a90ec049ed4a9af9e4be75465"
+content-hash = "8ffee1732c714e41582f8141c41c18d61e1ab38b6d0a934d930e3f137097f4cf"
