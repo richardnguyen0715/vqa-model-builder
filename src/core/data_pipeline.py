@@ -16,6 +16,7 @@ from torchvision import transforms
 
 from src.core.pipeline_logger import get_pipeline_logger, PipelineLogger
 from src.schema.data_schema import OneSample
+from src.data.dataset import vqa_collate_fn
 
 
 @dataclass
@@ -491,7 +492,7 @@ class DataPipeline:
             mode='val'
         ) if self.test_data else None
         
-        # Create dataloaders
+        # Create dataloaders with custom collate function for VQA
         self.logger.info("Creating dataloaders...")
         
         train_loader = DataLoader(
@@ -500,7 +501,8 @@ class DataPipeline:
             shuffle=True,
             num_workers=self.config.num_workers,
             pin_memory=self.config.pin_memory,
-            drop_last=True
+            drop_last=True,
+            collate_fn=vqa_collate_fn
         )
         
         val_loader = DataLoader(
@@ -508,7 +510,8 @@ class DataPipeline:
             batch_size=self.config.eval_batch_size,
             shuffle=False,
             num_workers=self.config.num_workers,
-            pin_memory=self.config.pin_memory
+            pin_memory=self.config.pin_memory,
+            collate_fn=vqa_collate_fn
         )
         
         test_loader = DataLoader(
@@ -516,7 +519,8 @@ class DataPipeline:
             batch_size=self.config.eval_batch_size,
             shuffle=False,
             num_workers=self.config.num_workers,
-            pin_memory=self.config.pin_memory
+            pin_memory=self.config.pin_memory,
+            collate_fn=vqa_collate_fn
         ) if test_dataset else None
         
         # Log dataloader info

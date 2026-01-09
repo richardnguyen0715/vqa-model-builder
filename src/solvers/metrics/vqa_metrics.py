@@ -6,7 +6,7 @@ Provides evaluation metrics for Vietnamese VQA models.
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional, Union, Tuple
 from dataclasses import dataclass, field
-from collections import defaultdict
+from collections import defaultdict, Counter
 import re
 
 import torch
@@ -644,6 +644,509 @@ class BLEUScore(BaseMetric):
         )
 
 
+class METEORScore(BaseMetric):
+    """
+    METEOR (Metric for Evaluation of Translation with Explicit ORdering) score.
+    Better handles synonyms and stemming compared to BLEU.
+    """
+    
+    def __init__(self, name: str = 'meteor'):
+        super().__init__(name)
+    
+    def reset(self):
+        """Reset metric state."""
+        self.predictions = []
+        self.references = []
+        self.per_sample_scores = []
+    
+    def update(
+        self,
+        predictions: List[str],
+        references: List[List[str]]
+    ):
+        """
+        Update METEOR.
+        
+        Args:
+            predictions: Predicted strings
+            references: Reference strings (multiple per sample)
+        """
+        self.predictions.extend(predictions)
+        self.references.extend(references)
+    
+    def compute(self) -> MetricResult:
+        """Compute METEOR score."""
+        try:
+            from nltk.translate.meteor_score import meteor_score
+            import nltk
+            try:
+                nltk.data.find('corpora/wordnet')
+            except LookupError:
+                nltk.download('wordnet', quiet=True)
+        except ImportError:
+            raise ImportError("NLTK required for METEOR. Install with: pip install nltk")
+        
+        self.per_sample_scores = []
+        for pred, refs in zip(self.predictions, self.references):
+            # METEOR compares tokenized hypothesis with tokenized references
+            pred_tokens = pred.split()
+            refs_tokens = [ref.split() for ref in refs]
+            
+            # Get best score among all references
+            best_score = 0.0
+            for ref_tokens in refs_tokens:
+                try:
+                    score = meteor_score([ref_tokens], pred_tokens)
+                    best_score = max(best_score, score)
+                except Exception:
+                    continue
+            
+            self.per_sample_scores.append(best_score)
+        
+        avg_score = np.mean(self.per_sample_scores) if self.per_sample_scores else 0.0
+        
+        return MetricResult(
+            value=avg_score,
+            per_sample=self.per_sample_scores,
+            metadata={'total_samples': len(self.predictions)}
+        )
+
+
+class ROUGEScore(BaseMetric):
+    """
+    ROUGE (Recall-Oriented Understudy for Gisting Evaluation) score.
+    Commonly used for summarization but applicable to VQA.
+    """
+    
+    def __init__(
+        self,
+        rouge_type: str = 'rougeL',  # rouge1, rouge2, rougeL
+        name: Optional[str] = None
+    ):
+        """
+        Initialize ROUGE score.
+        
+        Args:
+            rouge_type: Type of ROUGE (rouge1, rouge2, rougeL)
+            name: Metric name
+        """
+        self.rouge_type = rouge_type
+        name = name or rouge_type
+        super().__init__(name)
+    
+    def reset(self):
+        """Reset metric state."""
+        self.predictions = []
+        self.references = []
+        self.per_sample_scores = []
+    
+    def update(
+        self,
+        predictions: List[str],
+        references: List[List[str]]
+    ):
+        """
+        Update ROUGE.
+        
+        Args:
+            predictions: Predicted strings
+            references: Reference strings (multiple per sample)
+        """
+        self.predictions.extend(predictions)
+        self.references.extend(references)
+    
+    def _compute_rouge_l(self, pred: str, ref: str) -> float:
+        """Compute ROUGE-L using Longest Common Subsequence."""
+        pred_tokens = pred.lower().split()
+        ref_tokens = ref.lower().split()
+        
+        if not pred_tokens or not ref_tokens:
+            return 0.0
+        
+        # LCS computation
+        m, n = len(pred_tokens), len(ref_tokens)
+        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        
+        for i in range(1, m + 1):
+            for j in range(1, n + 1):
+                if pred_tokens[i-1] == ref_tokens[j-1]:
+                    dp[i][j] = dp[i-1][j-1] + 1
+                else:
+                    dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+        
+        lcs_length = dp[m][n]
+        
+        # Compute precision, recall, and F1
+        precision = lcs_length / len(pred_tokens) if pred_tokens else 0.0
+        recall = lcs_length / len(ref_tokens) if ref_tokens else 0.0
+        
+        if precision + recall == 0:
+            return 0.0
+        
+        f1 = 2 * precision * recall / (precision + recall)
+        return f1
+    
+    def _compute_rouge_n(self, pred: str, ref: str, n: int) -> float:
+        """Compute ROUGE-N using n-gram overlap."""
+        def get_ngrams(tokens, n):
+            return [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
+        
+        pred_tokens = pred.lower().split()
+        ref_tokens = ref.lower().split()
+        
+        if len(pred_tokens) < n or len(ref_tokens) < n:
+            return 0.0
+        
+        pred_ngrams = get_ngrams(pred_tokens, n)
+        ref_ngrams = get_ngrams(ref_tokens, n)
+        
+        pred_counter = Counter(pred_ngrams)
+        ref_counter = Counter(ref_ngrams)
+        
+        overlap = sum((pred_counter & ref_counter).values())
+        
+        precision = overlap / len(pred_ngrams) if pred_ngrams else 0.0
+        recall = overlap / len(ref_ngrams) if ref_ngrams else 0.0
+        
+        if precision + recall == 0:
+            return 0.0
+        
+        f1 = 2 * precision * recall / (precision + recall)
+        return f1
+    
+    def compute(self) -> MetricResult:
+        """Compute ROUGE score."""
+        self.per_sample_scores = []
+        
+        for pred, refs in zip(self.predictions, self.references):
+            # Get best score among all references
+            best_score = 0.0
+            for ref in refs:
+                if self.rouge_type == 'rougeL':
+                    score = self._compute_rouge_l(pred, ref)
+                elif self.rouge_type == 'rouge1':
+                    score = self._compute_rouge_n(pred, ref, 1)
+                elif self.rouge_type == 'rouge2':
+                    score = self._compute_rouge_n(pred, ref, 2)
+                else:
+                    score = self._compute_rouge_l(pred, ref)
+                
+                best_score = max(best_score, score)
+            
+            self.per_sample_scores.append(best_score)
+        
+        avg_score = np.mean(self.per_sample_scores) if self.per_sample_scores else 0.0
+        
+        return MetricResult(
+            value=avg_score,
+            per_sample=self.per_sample_scores,
+            metadata={'rouge_type': self.rouge_type, 'total_samples': len(self.predictions)}
+        )
+
+
+class CIDErScore(BaseMetric):
+    """
+    CIDEr (Consensus-based Image Description Evaluation) score.
+    Measures consensus between predicted and reference captions using TF-IDF.
+    """
+    
+    def __init__(
+        self,
+        n_gram: int = 4,
+        name: str = 'cider'
+    ):
+        """
+        Initialize CIDEr score.
+        
+        Args:
+            n_gram: Maximum n-gram order
+            name: Metric name
+        """
+        self.n_gram = n_gram
+        super().__init__(name)
+    
+    def reset(self):
+        """Reset metric state."""
+        self.predictions = []
+        self.references = []
+        self.per_sample_scores = []
+    
+    def update(
+        self,
+        predictions: List[str],
+        references: List[List[str]]
+    ):
+        """
+        Update CIDEr.
+        
+        Args:
+            predictions: Predicted strings
+            references: Reference strings (multiple per sample)
+        """
+        self.predictions.extend(predictions)
+        self.references.extend(references)
+    
+    def _get_ngrams(self, sentence: str, n: int) -> Counter:
+        """Get n-grams from a sentence."""
+        tokens = sentence.lower().split()
+        ngrams = [tuple(tokens[i:i+n]) for i in range(len(tokens)-n+1)]
+        return Counter(ngrams)
+    
+    def _compute_document_frequency(self) -> Dict:
+        """Compute document frequency for each n-gram."""
+        df = {}
+        num_docs = len(self.references)
+        
+        for n in range(1, self.n_gram + 1):
+            df[n] = defaultdict(int)
+            for refs in self.references:
+                ngram_set = set()
+                for ref in refs:
+                    ngrams = self._get_ngrams(ref, n)
+                    ngram_set.update(ngrams.keys())
+                for ngram in ngram_set:
+                    df[n][ngram] += 1
+        
+        return df, num_docs
+    
+    def _compute_tfidf(self, sentence: str, df: Dict, num_docs: int) -> Dict:
+        """Compute TF-IDF vector for a sentence."""
+        tfidf = {}
+        
+        for n in range(1, self.n_gram + 1):
+            ngrams = self._get_ngrams(sentence, n)
+            tfidf[n] = {}
+            
+            for ngram, count in ngrams.items():
+                # TF: term frequency
+                tf = count
+                # IDF: inverse document frequency
+                doc_freq = df[n].get(ngram, 0)
+                if doc_freq > 0:
+                    idf = np.log((num_docs + 1) / (doc_freq + 1))
+                else:
+                    idf = 0.0
+                
+                tfidf[n][ngram] = tf * idf
+        
+        return tfidf
+    
+    def _cosine_similarity(self, vec1: Dict, vec2: Dict) -> float:
+        """Compute cosine similarity between two vectors."""
+        dot_product = 0.0
+        norm1 = 0.0
+        norm2 = 0.0
+        
+        all_keys = set(vec1.keys()) | set(vec2.keys())
+        
+        for key in all_keys:
+            v1 = vec1.get(key, 0.0)
+            v2 = vec2.get(key, 0.0)
+            dot_product += v1 * v2
+            norm1 += v1 ** 2
+            norm2 += v2 ** 2
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        return dot_product / (np.sqrt(norm1) * np.sqrt(norm2))
+    
+    def compute(self) -> MetricResult:
+        """Compute CIDEr score."""
+        if not self.predictions:
+            return MetricResult(value=0.0)
+        
+        df, num_docs = self._compute_document_frequency()
+        self.per_sample_scores = []
+        
+        for pred, refs in zip(self.predictions, self.references):
+            pred_tfidf = self._compute_tfidf(pred, df, num_docs)
+            
+            # Compute average similarity with all references
+            similarities = []
+            for ref in refs:
+                ref_tfidf = self._compute_tfidf(ref, df, num_docs)
+                
+                # Average over n-gram orders
+                sim_per_n = []
+                for n in range(1, self.n_gram + 1):
+                    sim = self._cosine_similarity(pred_tfidf[n], ref_tfidf[n])
+                    sim_per_n.append(sim)
+                
+                avg_sim = np.mean(sim_per_n) if sim_per_n else 0.0
+                similarities.append(avg_sim)
+            
+            # CIDEr uses mean over references
+            cider_score = np.mean(similarities) if similarities else 0.0
+            self.per_sample_scores.append(cider_score)
+        
+        # Scale by 10 (standard CIDEr scaling)
+        avg_score = np.mean(self.per_sample_scores) * 10 if self.per_sample_scores else 0.0
+        
+        return MetricResult(
+            value=avg_score,
+            per_sample=[s * 10 for s in self.per_sample_scores],
+            metadata={'n_gram': self.n_gram, 'total_samples': len(self.predictions)}
+        )
+
+
+class VQASoftAccuracy(BaseMetric):
+    """
+    Proper VQA v2 soft accuracy metric.
+    Formula: accuracy = min(#humans_that_provided_answer / 3, 1)
+    
+    This metric compares the predicted answer against all annotator answers
+    and computes accuracy based on how many annotators agreed with the prediction.
+    """
+    
+    def __init__(
+        self,
+        id2answer: Optional[Dict[int, str]] = None,
+        name: str = 'vqa_soft_accuracy'
+    ):
+        """
+        Initialize VQA soft accuracy.
+        
+        Args:
+            id2answer: Mapping from answer ID to answer string
+            name: Metric name
+        """
+        self.id2answer = id2answer or {}
+        super().__init__(name)
+    
+    def reset(self):
+        """Reset metric state."""
+        self.scores = []
+        self.total = 0
+    
+    def update(
+        self,
+        predictions: torch.Tensor,
+        answer_counts: List[Dict[int, int]]
+    ):
+        """
+        Update VQA soft accuracy.
+        
+        Args:
+            predictions: Predicted answer indices [batch]
+            answer_counts: List of dicts mapping answer_id -> count for each sample
+        """
+        if predictions.dim() == 2:
+            predictions = predictions.argmax(dim=-1)
+        
+        for pred, counts in zip(predictions, answer_counts):
+            pred_id = pred.item()
+            
+            # VQA v2 formula: min(count / 3, 1)
+            if pred_id in counts:
+                score = min(counts[pred_id] / 3.0, 1.0)
+            else:
+                score = 0.0
+            
+            self.scores.append(score)
+        
+        self.total += len(answer_counts)
+    
+    def compute(self) -> MetricResult:
+        """Compute VQA soft accuracy."""
+        if not self.scores:
+            return MetricResult(value=0.0)
+        
+        accuracy = np.mean(self.scores)
+        
+        return MetricResult(
+            value=accuracy,
+            per_sample=self.scores,
+            metadata={'total_samples': self.total}
+        )
+
+
+class PrecisionRecallF1(BaseMetric):
+    """
+    Precision, Recall, and F1 metrics for VQA.
+    Computes these at the answer level (word overlap).
+    """
+    
+    def __init__(
+        self,
+        name: str = 'precision_recall_f1'
+    ):
+        super().__init__(name)
+    
+    def reset(self):
+        """Reset metric state."""
+        self.precisions = []
+        self.recalls = []
+        self.f1s = []
+    
+    def _normalize(self, text: str) -> set:
+        """Normalize text and return set of words."""
+        # Lowercase and remove punctuation
+        text = re.sub(r'[^\w\s]', '', text.lower())
+        return set(text.split())
+    
+    def update(
+        self,
+        predictions: List[str],
+        references: List[List[str]]
+    ):
+        """
+        Update Precision, Recall, F1.
+        
+        Args:
+            predictions: Predicted answer strings
+            references: Reference answer strings (multiple per sample)
+        """
+        for pred, refs in zip(predictions, references):
+            pred_words = self._normalize(pred)
+            
+            # Compute against all references and take best F1
+            best_precision = 0.0
+            best_recall = 0.0
+            best_f1 = 0.0
+            
+            for ref in refs:
+                ref_words = self._normalize(ref)
+                
+                if not pred_words or not ref_words:
+                    continue
+                
+                overlap = pred_words & ref_words
+                
+                precision = len(overlap) / len(pred_words) if pred_words else 0.0
+                recall = len(overlap) / len(ref_words) if ref_words else 0.0
+                
+                if precision + recall > 0:
+                    f1 = 2 * precision * recall / (precision + recall)
+                else:
+                    f1 = 0.0
+                
+                if f1 > best_f1:
+                    best_precision = precision
+                    best_recall = recall
+                    best_f1 = f1
+            
+            self.precisions.append(best_precision)
+            self.recalls.append(best_recall)
+            self.f1s.append(best_f1)
+    
+    def compute(self) -> MetricResult:
+        """Compute Precision, Recall, F1."""
+        avg_precision = np.mean(self.precisions) if self.precisions else 0.0
+        avg_recall = np.mean(self.recalls) if self.recalls else 0.0
+        avg_f1 = np.mean(self.f1s) if self.f1s else 0.0
+        
+        return MetricResult(
+            value=avg_f1,
+            metadata={
+                'precision': avg_precision,
+                'recall': avg_recall,
+                'f1': avg_f1,
+                'total_samples': len(self.f1s)
+            }
+        )
+
+
 class MetricCollection:
     """
     Collection of metrics for comprehensive evaluation.
@@ -695,7 +1198,8 @@ class MetricCollection:
 
 def create_vqa_metrics(
     num_classes: int = 3000,
-    answer_types: Optional[List[str]] = None
+    answer_types: Optional[List[str]] = None,
+    id2answer: Optional[Dict[int, str]] = None
 ) -> MetricCollection:
     """
     Create standard VQA metric collection.
@@ -703,15 +1207,22 @@ def create_vqa_metrics(
     Args:
         num_classes: Number of answer classes
         answer_types: List of answer types for per-type metrics
+        id2answer: Mapping from answer ID to answer string
         
     Returns:
         Metric collection
     """
     metrics = [
         VQAAccuracy(use_soft_accuracy=True),
+        VQASoftAccuracy(id2answer=id2answer),
         TopKAccuracy(k=5),
         TopKAccuracy(k=10),
         F1Score(num_classes=num_classes, average='macro'),
+        BLEUScore(n_gram=4),
+        METEORScore(),
+        ROUGEScore(rouge_type='rougeL'),
+        CIDErScore(n_gram=4),
+        PrecisionRecallF1(),
     ]
     
     if answer_types:
@@ -720,16 +1231,46 @@ def create_vqa_metrics(
     return MetricCollection(metrics)
 
 
+def create_comprehensive_vqa_metrics(
+    id2answer: Optional[Dict[int, str]] = None
+) -> Dict[str, BaseMetric]:
+    """
+    Create comprehensive VQA metrics for evaluation.
+    
+    Args:
+        id2answer: Mapping from answer ID to answer string
+        
+    Returns:
+        Dictionary of metric instances
+    """
+    return {
+        'vqa_accuracy': VQASoftAccuracy(id2answer=id2answer),
+        'exact_match': ExactMatchAccuracy(normalize=True),
+        'bleu': BLEUScore(n_gram=4),
+        'meteor': METEORScore(),
+        'rouge_l': ROUGEScore(rouge_type='rougeL'),
+        'rouge_1': ROUGEScore(rouge_type='rouge1'),
+        'cider': CIDErScore(n_gram=4),
+        'precision_recall_f1': PrecisionRecallF1(),
+    }
+
+
 __all__ = [
     'BaseMetric',
     'MetricResult',
     'VQAAccuracy',
+    'VQASoftAccuracy',
     'TopKAccuracy',
     'WUPS',
     'F1Score',
     'AnswerTypeAccuracy',
     'ExactMatchAccuracy',
     'BLEUScore',
+    'METEORScore',
+    'ROUGEScore',
+    'CIDErScore',
+    'PrecisionRecallF1',
     'MetricCollection',
-    'create_vqa_metrics'
+    'create_vqa_metrics',
+    'create_comprehensive_vqa_metrics'
 ]

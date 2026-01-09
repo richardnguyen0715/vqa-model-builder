@@ -137,15 +137,26 @@ class VQADataset(Dataset):
             # Dùng LongTensor cho CrossEntropyLoss
             label_tensor = torch.tensor(label_id, dtype=torch.long) 
             
-        # Get ground truth answer text for evaluation display
-        ground_truth_answer = ""
+        # Get ALL ground truth answers for proper VQA evaluation
+        # VQA evaluation requires comparing against all annotator answers
+        all_answers = []
         if self.mode == 'train' or self.mode == 'val' or self.mode == 'test':
             if isinstance(item, OneSample):
-                answers = item.answers
+                all_answers = item.answers if item.answers else []
             else:
-                answers = item.get('answers', [])
-            if answers:
-                ground_truth_answer = Counter(answers).most_common(1)[0][0]
+                all_answers = item.get('answers', [])
+        
+        # Build answer frequency dict for VQA v2 style soft accuracy
+        # Format: {answer_id: count} for each unique answer
+        answer_counts = {}
+        if all_answers:
+            counter = Counter(all_answers)
+            for ans, count in counter.items():
+                if ans in self.answer2id:
+                    ans_id = self.answer2id[ans]
+                else:
+                    ans_id = self.answer2id.get('<unk>', 0)
+                answer_counts[ans_id] = count
             
         return {
             'image': image,
@@ -153,7 +164,8 @@ class VQADataset(Dataset):
             'attention_mask': tokenized['attention_mask'],
             'label': label_tensor,
             'question': question,
-            'ground_truth': ground_truth_answer
+            'all_answers': all_answers,  # List of all 5 ground truth answers (strings)
+            'answer_counts': answer_counts  # Dict {answer_id: count} for VQA soft accuracy
         }
 
 # --- Helper Function: Xây dựng từ điển câu trả lời ---
@@ -189,6 +201,56 @@ def build_answer_vocab(data_list: List[Union[OneSample, Dict]], min_freq=5):
     return answer2id
 
 
+def vqa_collate_fn(batch):
+    """
+    Custom collate function for VQA datasets.
+    Handles mixed tensor and non-tensor data (strings, lists, dicts).
+    
+    Args:
+        batch: List of sample dictionaries from VQADataset
+        
+    Returns:
+        Collated batch dictionary with:
+        - image: Tensor [batch, C, H, W]
+        - input_ids: Tensor [batch, seq_len]
+        - attention_mask: Tensor [batch, seq_len]
+        - label: Tensor [batch]
+        - question: List[str]
+        - all_answers: List[List[str]] - all 5 ground truth answers for each sample
+        - answer_counts: List[Dict[int, int]] - {answer_id: count} for VQA soft accuracy
+    """
+    # Separate tensor and non-tensor data
+    images = []
+    input_ids = []
+    attention_masks = []
+    labels = []
+    questions = []
+    all_answers = []
+    answer_counts = []
+    
+    for sample in batch:
+        images.append(sample['image'])
+        input_ids.append(sample['input_ids'])
+        attention_masks.append(sample['attention_mask'])
+        labels.append(sample['label'])
+        questions.append(sample.get('question', ''))
+        all_answers.append(sample.get('all_answers', []))
+        answer_counts.append(sample.get('answer_counts', {}))
+    
+    # Stack tensors
+    collated = {
+        'image': torch.stack(images),
+        'input_ids': torch.stack(input_ids),
+        'attention_mask': torch.stack(attention_masks),
+        'label': torch.stack(labels),
+        'question': questions,  # List[str]
+        'all_answers': all_answers,  # List[List[str]]
+        'answer_counts': answer_counts  # List[Dict[int, int]]
+    }
+    
+    return collated
+
+
 def create_data_loaders(dataset, batch_size=32, num_workers=4, mode='train'):
     """
     Create DataLoaders for training, validation, and testing.
@@ -205,7 +267,8 @@ def create_data_loaders(dataset, batch_size=32, num_workers=4, mode='train'):
         batch_size=batch_size,
         shuffle=(mode == 'train'),
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
+        collate_fn=vqa_collate_fn  # Use custom collate function
     )
     
     data_process_logger.info(f"DataLoader created with batch_size={batch_size}, num_workers={num_workers}, mode={mode}")

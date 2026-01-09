@@ -1,7 +1,7 @@
 {
-  "timestamp": "2026-01-10T01:14:37.084459",
-  "execution_time": 27.942022,
-  "mode": "evaluate",
+  "timestamp": "2026-01-10T01:37:41.893957",
+  "execution_time": 269.710532,
+  "mode": "train",
   "status": "SUCCESS",
   "data": {
     "train_samples": 29661,
@@ -13,5 +13,24 @@
     "total_params": 243169739,
     "trainable_params": 243169739,
     "model_size_mb": 927.6189384460449
+  },
+  "training": {
+    "total_epochs": 1,
+    "total_steps": 926,
+    "best_metric": 1.0,
+    "best_model_path": "checkpoints/best_model.pt",
+    "final_metrics": {
+      "loss": 0.3268648755961451,
+      "accuracy": 1.0,
+      "vqa_accuracy": 0.33351317327578445,
+      "exact_match": 0.0,
+      "bleu": 0,
+      "meteor": 0.0,
+      "rouge_l": 0.0,
+      "cider": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    }
   }
 }

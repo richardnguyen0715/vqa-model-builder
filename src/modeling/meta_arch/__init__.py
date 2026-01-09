@@ -28,13 +28,21 @@ from .vqa_model import (
     create_vqa_model
 )
 
+from .generative_vqa_model import (
+    GenerativeVQAConfig,
+    GenerativeVQAOutput,
+    GenerativeVQAModel,
+    create_generative_vqa_model,
+    get_default_generative_vqa_config
+)
+
 __all__ = [
     # Config enums
     'BackboneType',
     'TextEncoderType',
     'FusionType',
     
-    # Config dataclasses
+    # Classification VQA Config dataclasses
     'VisualEncoderConfig',
     'TextEncoderConfig',
     'FusionConfig',
@@ -44,7 +52,7 @@ __all__ = [
     'VQAModelConfig',
     'get_default_vietnamese_vqa_config',
     
-    # Model components
+    # Classification VQA Model components
     'VQAOutput',
     'VisualEncoder',
     'TextEncoder',
@@ -52,5 +60,12 @@ __all__ = [
     'MultimodalFusion',
     'AnswerHead',
     'VietnameseVQAModel',
-    'create_vqa_model'
+    'create_vqa_model',
+    
+    # Generative VQA
+    'GenerativeVQAConfig',
+    'GenerativeVQAOutput',
+    'GenerativeVQAModel',
+    'create_generative_vqa_model',
+    'get_default_generative_vqa_config',
 ]

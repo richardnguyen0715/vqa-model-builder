@@ -34,6 +34,18 @@ from src.core.vqa_pipeline import (
     main
 )
 
+from src.core.generative_training_pipeline import (
+    GenerativeTrainingPipeline,
+    GenerativeTrainingConfig,
+    GenerativeTrainingOutput
+)
+
+from src.core.generative_vqa_pipeline import (
+    GenerativeVQAPipeline,
+    GenerativeVQAPipelineConfig,
+    GenerativeVQAPipelineOutput
+)
+
 
 __all__ = [
     # Logger
@@ -60,5 +72,13 @@ __all__ = [
     'VQAPipeline',
     'VQAPipelineConfig',
     'VQAPipelineOutput',
-    'main'
+    'main',
+    
+    # Generative VQA
+    'GenerativeTrainingPipeline',
+    'GenerativeTrainingConfig',
+    'GenerativeTrainingOutput',
+    'GenerativeVQAPipeline',
+    'GenerativeVQAPipelineConfig',
+    'GenerativeVQAPipelineOutput'
 ]

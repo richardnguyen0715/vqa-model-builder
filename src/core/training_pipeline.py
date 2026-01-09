@@ -55,7 +55,7 @@ class TrainingPipelineConfig:
     checkpoint_dir: str = "checkpoints"
     save_best: bool = True
     save_every_epoch: bool = True
-    metric_for_best: str = "accuracy"
+    metric_for_best: str = "vqa_accuracy"  # Use VQA soft accuracy for best model selection
     
     # Logging
     log_interval: int = 50  # Log every N steps
@@ -534,14 +534,29 @@ class TrainingPipeline:
         }
         
     def _validate_epoch(self, show_samples: bool = True) -> Dict[str, float]:
-        """Validate for one epoch.
+        """Validate for one epoch with comprehensive VQA metrics.
         
         Args:
             show_samples: Whether to display sample predictions
             
         Returns:
-            Dictionary of validation metrics
+            Dictionary of validation metrics including:
+            - loss: Average loss
+            - accuracy: Simple exact match accuracy  
+            - vqa_accuracy: VQA v2 soft accuracy (min(count/3, 1))
+            - bleu: BLEU-4 score
+            - meteor: METEOR score
+            - rouge_l: ROUGE-L score
+            - cider: CIDEr score
+            - precision: Word-level precision
+            - recall: Word-level recall
+            - f1: Word-level F1 score
         """
+        from src.solvers.metrics.vqa_metrics import (
+            VQASoftAccuracy, BLEUScore, METEORScore, 
+            ROUGEScore, CIDErScore, PrecisionRecallF1, ExactMatchAccuracy
+        )
+        
         self.model.eval()
         
         total_loss = 0.0
@@ -551,7 +566,16 @@ class TrainingPipeline:
         all_predictions = []
         all_labels = []
         
-        # Store sample predictions for display (separate correct and incorrect)
+        # Initialize metrics
+        vqa_soft_accuracy = VQASoftAccuracy(id2answer=self.id2answer)
+        bleu_metric = BLEUScore(n_gram=4)
+        meteor_metric = METEORScore()
+        rouge_metric = ROUGEScore(rouge_type='rougeL')
+        cider_metric = CIDErScore(n_gram=4)
+        prf_metric = PrecisionRecallF1()
+        exact_match = ExactMatchAccuracy(normalize=True)
+        
+        # Store sample predictions for display
         correct_samples = []
         incorrect_samples = []
         max_samples_each = self.num_samples_to_display // 2 + 1
@@ -562,7 +586,8 @@ class TrainingPipeline:
             for step, batch in enumerate(progress_bar):
                 # Extract non-tensor data before moving to device
                 questions = batch.get('question', [])
-                ground_truths = batch.get('ground_truth', [])
+                all_answers = batch.get('all_answers', [])  # List of lists, each with 5 answers
+                answer_counts = batch.get('answer_counts', [])  # List of dicts {answer_id: count}
                 
                 # Move batch to device (only tensors)
                 batch_tensors = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
@@ -581,6 +606,8 @@ class TrainingPipeline:
                 
                 if hasattr(outputs, 'logits'):
                     predictions = outputs.logits.argmax(dim=-1)
+                    
+                    # Simple exact match accuracy (for training comparison)
                     total_correct += (predictions == batch_tensors['label']).sum().item()
                     total_samples += batch_tensors['label'].size(0)
                     
@@ -590,61 +617,65 @@ class TrainingPipeline:
                     all_predictions.extend(pred_ids)
                     all_labels.extend(label_ids)
                     
-                    # Collect sample predictions - try to get diverse samples (correct & incorrect)
+                    # Convert predictions to text
+                    pred_texts = [self.id2answer.get(pid, "<unk>") for pid in pred_ids]
+                    
+                    # Update VQA soft accuracy metric
+                    if answer_counts:
+                        vqa_soft_accuracy.update(predictions.cpu(), answer_counts)
+                    
+                    # Update NLG metrics (BLEU, METEOR, ROUGE, CIDEr, P/R/F1)
+                    if all_answers:
+                        # Ensure all_answers is a list of lists
+                        refs_batch = []
+                        for ans_list in all_answers:
+                            if isinstance(ans_list, list):
+                                refs_batch.append(ans_list if ans_list else [""])
+                            else:
+                                refs_batch.append([ans_list] if ans_list else [""])
+                        
+                        bleu_metric.update(pred_texts, refs_batch)
+                        meteor_metric.update(pred_texts, refs_batch)
+                        rouge_metric.update(pred_texts, refs_batch)
+                        cider_metric.update(pred_texts, refs_batch)
+                        prf_metric.update(pred_texts, refs_batch)
+                        exact_match.update(pred_texts, refs_batch)
+                    
+                    # Collect sample predictions for display
                     if show_samples and self.id2answer:
                         for i in range(len(pred_ids)):
                             question = questions[i] if i < len(questions) else "N/A"
-                            ground_truth = ground_truths[i] if i < len(ground_truths) else "N/A"
-                            pred_answer = self.id2answer.get(pred_ids[i], f"<ID:{pred_ids[i]}>")
-                            is_correct = pred_ids[i] == label_ids[i]
                             
-                            # Mark if ground truth is not in vocabulary
-                            gt_in_vocab = label_ids[i] != 0 or ground_truth == "<unk>"
+                            # Get all 5 ground truth answers
+                            gt_answers = []
+                            if i < len(all_answers) and all_answers[i]:
+                                gt_answers = all_answers[i] if isinstance(all_answers[i], list) else [all_answers[i]]
+                            
+                            pred_answer = self.id2answer.get(pred_ids[i], f"<ID:{pred_ids[i]}>")
+                            
+                            # Check if prediction matches any of the ground truths
+                            is_correct = any(pred_answer.lower().strip() == gt.lower().strip() for gt in gt_answers)
+                            
+                            # Calculate VQA-style score for this sample
+                            vqa_score = 0.0
+                            if i < len(answer_counts) and pred_ids[i] in answer_counts[i]:
+                                vqa_score = min(answer_counts[i][pred_ids[i]] / 3.0, 1.0)
                             
                             sample = {
                                 'question': question,
                                 'predicted': pred_answer,
-                                'ground_truth': ground_truth,
+                                'all_answers': gt_answers,
                                 'correct': is_correct,
-                                'gt_in_vocab': gt_in_vocab
+                                'vqa_score': vqa_score
                             }
                             
-                            # Prioritize samples where ground truth IS in vocabulary (more meaningful)
-                            if label_ids[i] != 0:  # ground truth is in vocabulary
-                                if is_correct and len(correct_samples) < max_samples_each:
-                                    correct_samples.append(sample)
-                                elif not is_correct and len(incorrect_samples) < max_samples_each:
-                                    incorrect_samples.append(sample)
+                            if is_correct and len(correct_samples) < max_samples_each:
+                                correct_samples.append(sample)
+                            elif not is_correct and len(incorrect_samples) < max_samples_each:
+                                incorrect_samples.append(sample)
                             
-                            # Stop collecting if we have enough of both
                             if len(correct_samples) >= max_samples_each and len(incorrect_samples) >= max_samples_each:
                                 break
-                        
-                        # If we don't have enough samples with ground truth in vocab, 
-                        # also collect some with <unk> ground truth
-                        if len(correct_samples) + len(incorrect_samples) < self.num_samples_to_display:
-                            for i in range(len(pred_ids)):
-                                if label_ids[i] == 0:  # ground truth is <unk>
-                                    question = questions[i] if i < len(questions) else "N/A"
-                                    ground_truth = ground_truths[i] if i < len(ground_truths) else "N/A"
-                                    pred_answer = self.id2answer.get(pred_ids[i], f"<ID:{pred_ids[i]}>")
-                                    is_correct = pred_ids[i] == label_ids[i]
-                                    
-                                    sample = {
-                                        'question': question,
-                                        'predicted': pred_answer,
-                                        'ground_truth': f"{ground_truth} (ngoài vocab)",
-                                        'correct': is_correct,
-                                        'gt_in_vocab': False
-                                    }
-                                    
-                                    if is_correct and len(correct_samples) < max_samples_each:
-                                        correct_samples.append(sample)
-                                    elif not is_correct and len(incorrect_samples) < max_samples_each:
-                                        incorrect_samples.append(sample)
-                                    
-                                    if len(correct_samples) + len(incorrect_samples) >= self.num_samples_to_display:
-                                        break
                     
                 # Update progress bar
                 steps_done = step + 1
@@ -652,40 +683,119 @@ class TrainingPipeline:
                 accuracy = total_correct / total_samples if total_samples > 0 else 0
                 progress_bar.set_postfix({'loss': f'{avg_loss:.4f}', 'acc': f'{accuracy:.4f}'})
                 
-        # Calculate metrics
+        # Calculate all metrics
         avg_loss = total_loss / len(self.val_loader)
-        accuracy = total_correct / total_samples if total_samples > 0 else 0
+        simple_accuracy = total_correct / total_samples if total_samples > 0 else 0
+        
+        # Compute VQA metrics
+        vqa_acc_result = vqa_soft_accuracy.compute()
+        bleu_result = bleu_metric.compute()
+        exact_match_result = exact_match.compute()
+        prf_result = prf_metric.compute()
+        
+        # Try to compute METEOR, ROUGE, CIDEr (may fail if NLTK not available)
+        try:
+            meteor_result = meteor_metric.compute()
+            meteor_score = meteor_result.value
+        except Exception as e:
+            self.logger.warning(f"METEOR computation failed: {e}")
+            meteor_score = 0.0
+            
+        try:
+            rouge_result = rouge_metric.compute()
+            rouge_score = rouge_result.value
+        except Exception as e:
+            self.logger.warning(f"ROUGE computation failed: {e}")
+            rouge_score = 0.0
+            
+        try:
+            cider_result = cider_metric.compute()
+            cider_score = cider_result.value
+        except Exception as e:
+            self.logger.warning(f"CIDEr computation failed: {e}")
+            cider_score = 0.0
         
         # Display sample predictions (mix of correct and incorrect)
         if show_samples and (correct_samples or incorrect_samples):
-            # Combine samples: show some correct, then some incorrect
             combined_samples = correct_samples[:max_samples_each] + incorrect_samples[:max_samples_each]
             self._display_sample_predictions(combined_samples[:self.num_samples_to_display])
         
-        # Additional metrics
+        # Build metrics dictionary
         metrics = {
             'loss': avg_loss,
-            'accuracy': accuracy
+            'accuracy': simple_accuracy,  # Simple exact match (for backward compat)
+            'vqa_accuracy': vqa_acc_result.value,  # VQA v2 soft accuracy
+            'exact_match': exact_match_result.value,
+            'bleu': bleu_result.value,
+            'meteor': meteor_score,
+            'rouge_l': rouge_score,
+            'cider': cider_score,
+            'precision': prf_result.metadata.get('precision', 0.0),
+            'recall': prf_result.metadata.get('recall', 0.0),
+            'f1': prf_result.value
         }
+        
+        # Log comprehensive metrics
+        self._log_comprehensive_metrics(metrics)
         
         return metrics
     
-    def _display_sample_predictions(self, samples: List[Dict]):
-        """Display sample predictions in a formatted way."""
+    def _log_comprehensive_metrics(self, metrics: Dict[str, float]):
+        """Log comprehensive evaluation metrics in a formatted way."""
         self.logger.info("")
-        self.logger.subsection("Sample Predictions")
+        self.logger.subsection("📊 Comprehensive VQA Metrics")
+        self.logger.info("=" * 60)
+        
+        self.logger.info("  📈 Classification Metrics:")
+        self.logger.info(f"      • Loss: {metrics['loss']:.4f}")
+        self.logger.info(f"      • Simple Accuracy: {metrics['accuracy']:.4f} ({metrics['accuracy']*100:.2f}%)")
+        self.logger.info(f"      • VQA Accuracy (soft): {metrics['vqa_accuracy']:.4f} ({metrics['vqa_accuracy']*100:.2f}%)")
+        self.logger.info(f"      • Exact Match: {metrics['exact_match']:.4f} ({metrics['exact_match']*100:.2f}%)")
+        
+        self.logger.info("")
+        self.logger.info("  📝 NLG Metrics:")
+        self.logger.info(f"      • BLEU-4: {metrics['bleu']:.4f}")
+        self.logger.info(f"      • METEOR: {metrics['meteor']:.4f}")
+        self.logger.info(f"      • ROUGE-L: {metrics['rouge_l']:.4f}")
+        self.logger.info(f"      • CIDEr: {metrics['cider']:.4f}")
+        
+        self.logger.info("")
+        self.logger.info("  🎯 Precision/Recall/F1:")
+        self.logger.info(f"      • Precision: {metrics['precision']:.4f}")
+        self.logger.info(f"      • Recall: {metrics['recall']:.4f}")
+        self.logger.info(f"      • F1 Score: {metrics['f1']:.4f}")
+        
+        self.logger.info("=" * 60)
+        self.logger.info("")
+    
+    def _display_sample_predictions(self, samples: List[Dict]):
+        """Display sample predictions with all ground truth answers."""
+        self.logger.info("")
+        self.logger.subsection("🔍 Sample Predictions")
         
         for i, sample in enumerate(samples, 1):
             status = "✓" if sample['correct'] else "✗"
+            vqa_score = sample.get('vqa_score', 0.0)
+            
             self.logger.info(f"")
-            self.logger.info(f"  [{status}] Sample {i}:")
-            self.logger.info(f"      Câu hỏi: \"{sample['question']}\"")
-            self.logger.info(f"      Mô hình trả lời: \"{sample['predicted']}\"")
-            self.logger.info(f"      Đáp án đúng: \"{sample['ground_truth']}\"")
+            self.logger.info(f"  [{status}] Sample {i} (VQA Score: {vqa_score:.2f}):")
+            self.logger.info(f"      📌 Câu hỏi: \"{sample['question']}\"")
+            self.logger.info(f"      🤖 Mô hình trả lời: \"{sample['predicted']}\"")
+            
+            # Display all 5 ground truth answers
+            all_answers = sample.get('all_answers', [])
+            if all_answers:
+                self.logger.info(f"      ✅ Các đáp án ground truth ({len(all_answers)}):")
+                for j, ans in enumerate(all_answers, 1):
+                    match_indicator = "←" if sample['predicted'].lower().strip() == ans.lower().strip() else ""
+                    self.logger.info(f"          {j}. \"{ans}\" {match_indicator}")
+            else:
+                self.logger.info(f"      ✅ Đáp án đúng: N/A")
         
         correct_count = sum(1 for s in samples if s['correct'])
+        avg_vqa_score = sum(s.get('vqa_score', 0.0) for s in samples) / len(samples) if samples else 0.0
         self.logger.info(f"")
-        self.logger.info(f"  Sample accuracy: {correct_count}/{len(samples)}")
+        self.logger.info(f"  📊 Sample Stats: {correct_count}/{len(samples)} correct, Avg VQA Score: {avg_vqa_score:.2f}")
         self.logger.info("")
         
     def _save_checkpoint(self, is_best: bool, metrics: Dict[str, float]):
