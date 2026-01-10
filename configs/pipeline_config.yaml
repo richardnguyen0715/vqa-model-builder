@@ -76,10 +76,19 @@ model:
   
   # Mixture of Experts (MOE)
   use_moe: false
+  moe_type: standard  # standard, vqa, sparse
   moe_num_experts: 8
   moe_top_k: 2
   moe_hidden_dim: 2048
   moe_load_balance_weight: 0.01
+  moe_position: fusion  # fusion, decoder, both
+  
+  # VQA MOE Specialized Experts (when moe_type: vqa)
+  num_vision_experts: 2        # Visual processing experts
+  num_text_experts: 2          # Text processing experts
+  num_multimodal_experts: 2    # Cross-modal experts
+  num_specialized_experts: 2   # Task-specific experts (Segmentation, Detection, OCR, etc.)
+  vietnamese_optimized: true   # Enable Vietnamese text optimization in OCR expert
   
   # Knowledge/RAG
   use_knowledge: false

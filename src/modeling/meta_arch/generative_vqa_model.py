@@ -19,6 +19,10 @@ from transformers import (
     GPT2Config
 )
 
+# Import MOE components
+from src.modeling.moe.moe_layer import MOELayer, VQAMOELayer, SparseMOELayer
+from src.modeling.moe.moe_config import MOEConfig
+
 
 @dataclass
 class GenerativeVQAConfig:
@@ -54,6 +58,22 @@ class GenerativeVQAConfig:
     fusion_num_heads: int = 8
     fusion_num_layers: int = 2
     fusion_dropout: float = 0.1
+    
+    # MOE (Mixture of Experts)
+    use_moe: bool = False
+    moe_type: str = 'standard'  # 'standard', 'vqa', 'sparse'
+    num_experts: int = 4
+    num_experts_per_token: int = 2
+    expert_capacity_factor: float = 1.25
+    moe_loss_weight: float = 0.01
+    moe_position: str = 'fusion'  # 'fusion', 'decoder', 'both'
+    
+    # VQA MOE specific (when moe_type='vqa')
+    num_vision_experts: int = 1
+    num_text_experts: int = 1
+    num_multimodal_experts: int = 1
+    num_specialized_experts: int = 1  # SegmentationExpert, ObjectDetectionExpert, OCRExpert, etc.
+    vietnamese_optimized: bool = True
     
     # Generation
     vocab_size: int = 64000  # PhoBERT vocab size
@@ -171,11 +191,13 @@ class QuestionEncoder(nn.Module):
 
 
 class CrossModalFusion(nn.Module):
-    """Cross-modal fusion between visual and text features."""
+    """Cross-modal fusion between visual and text features with optional MOE."""
     
     def __init__(self, config: GenerativeVQAConfig):
         super().__init__()
         self.config = config
+        self.use_moe = config.use_moe and config.moe_position in ['fusion', 'both']
+        self.moe_type = config.moe_type if hasattr(config, 'moe_type') else 'standard'
         
         # Cross-attention layers
         self.layers = nn.ModuleList([
@@ -191,6 +213,74 @@ class CrossModalFusion(nn.Module):
             for _ in range(config.fusion_num_layers)
         ])
         
+        # MOE layer (optional) - replaces FFN in fusion
+        self.moe_layer = None
+        self.moe_aux_loss = 0.0
+        if self.use_moe:
+            self._create_moe_layer(config)
+        
+        self.layer_norm = nn.LayerNorm(config.fusion_dim)
+    
+    def _create_moe_layer(self, config: GenerativeVQAConfig):
+        """Create MOE layer based on configuration."""
+        from src.modeling.moe.moe_config import RouterConfig
+        
+        if self.moe_type == 'vqa':
+            # Use VQAMOELayer with specialized experts
+            self.moe_layer = VQAMOELayer(
+                input_dim=config.fusion_dim,
+                hidden_dim=config.decoder_ff_dim,
+                output_dim=config.fusion_dim,
+                num_vision_experts=getattr(config, 'num_vision_experts', 1),
+                num_text_experts=getattr(config, 'num_text_experts', 1),
+                num_multimodal_experts=getattr(config, 'num_multimodal_experts', 1),
+                num_specialized_experts=getattr(config, 'num_specialized_experts', 1),
+                top_k=config.num_experts_per_token,
+                dropout=config.fusion_dropout,
+                vietnamese_optimized=getattr(config, 'vietnamese_optimized', True)
+            )
+        elif self.moe_type == 'sparse':
+            # Use SparseMOELayer for memory efficiency
+            router_config = RouterConfig(
+                router_type='topk',
+                num_experts=config.num_experts,
+                top_k=config.num_experts_per_token,
+                capacity_factor=config.expert_capacity_factor,
+                load_balance_weight=config.moe_loss_weight,
+                use_aux_loss=True
+            )
+            moe_config = MOEConfig(
+                input_dim=config.fusion_dim,
+                hidden_dim=config.decoder_ff_dim,
+                output_dim=config.fusion_dim,
+                num_experts=config.num_experts,
+                num_experts_per_token=config.num_experts_per_token,
+                router_config=router_config,
+                expert_dropout=config.fusion_dropout,
+                use_sparse_moe=True
+            )
+            self.moe_layer = SparseMOELayer(config=moe_config)
+        else:
+            # Standard MOELayer with FeedForwardExperts
+            router_config = RouterConfig(
+                router_type='topk',
+                num_experts=config.num_experts,
+                top_k=config.num_experts_per_token,
+                capacity_factor=config.expert_capacity_factor,
+                load_balance_weight=config.moe_loss_weight,
+                use_aux_loss=True
+            )
+            moe_config = MOEConfig(
+                input_dim=config.fusion_dim,
+                hidden_dim=config.decoder_ff_dim,
+                output_dim=config.fusion_dim,
+                num_experts=config.num_experts,
+                num_experts_per_token=config.num_experts_per_token,
+                router_config=router_config,
+                expert_dropout=config.fusion_dropout
+            )
+            self.moe_layer = MOELayer(config=moe_config)
+        
         self.layer_norm = nn.LayerNorm(config.fusion_dim)
     
     def forward(
@@ -198,7 +288,7 @@ class CrossModalFusion(nn.Module):
         visual_features: torch.Tensor,
         question_features: torch.Tensor,
         question_mask: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, float]:
         """
         Fuse visual and question features.
         
@@ -209,6 +299,7 @@ class CrossModalFusion(nn.Module):
             
         Returns:
             fused_features: [batch, num_patches + seq_len, dim]
+            moe_aux_loss: Auxiliary loss from MOE layer (0.0 if MOE not used)
         """
         # Concatenate visual and question features
         # Visual features come first, then question
@@ -233,7 +324,19 @@ class CrossModalFusion(nn.Module):
         for layer in self.layers:
             fused = layer(fused, src_key_padding_mask=src_key_padding_mask)
         
-        return self.layer_norm(fused)
+        # Apply MOE layer if enabled
+        moe_aux_loss = 0.0
+        if self.moe_layer is not None:
+            # MOELayer.forward() returns tensor directly
+            fused = self.moe_layer(fused)
+            # Get auxiliary loss for load balancing
+            aux_loss = self.moe_layer.get_aux_loss()
+            if isinstance(aux_loss, torch.Tensor):
+                moe_aux_loss = aux_loss.item() if aux_loss.numel() == 1 else aux_loss.mean().item()
+            else:
+                moe_aux_loss = float(aux_loss) if aux_loss else 0.0
+        
+        return self.layer_norm(fused), moe_aux_loss
 
 
 class TransformerDecoder(nn.Module):
@@ -437,8 +540,8 @@ class GenerativeVQAModel(nn.Module):
         # Encode question
         question_features, question_mask = self.question_encoder(input_ids, attention_mask)
         
-        # Fuse multimodal features
-        encoder_hidden_states = self.fusion(visual_features, question_features, question_mask)
+        # Fuse multimodal features (returns tuple with MOE aux loss)
+        encoder_hidden_states, moe_aux_loss = self.fusion(visual_features, question_features, question_mask)
         
         # Create encoder attention mask (all ones for visual + question mask)
         batch_size = pixel_values.size(0)
@@ -472,6 +575,10 @@ class GenerativeVQAModel(nn.Module):
             shift_logits = logits.contiguous().view(-1, self.config.vocab_size)
             shift_labels = labels.contiguous().view(-1)
             loss = self.loss_fn(shift_logits, shift_labels)
+            
+            # Add MOE auxiliary loss (load balancing)
+            if self.config.use_moe and moe_aux_loss > 0:
+                loss = loss + self.config.moe_loss_weight * moe_aux_loss
         
         return GenerativeVQAOutput(
             logits=logits,
@@ -517,7 +624,8 @@ class GenerativeVQAModel(nn.Module):
         # Encode
         visual_features = self.visual_encoder(pixel_values)
         question_features, question_mask = self.question_encoder(input_ids, attention_mask)
-        encoder_hidden_states = self.fusion(visual_features, question_features, question_mask)
+        # fusion returns (output, moe_aux_loss) tuple
+        encoder_hidden_states, _ = self.fusion(visual_features, question_features, question_mask)
         
         # Encoder attention mask
         num_visual = visual_features.size(1)
@@ -628,7 +736,19 @@ def get_default_generative_vqa_config(
         bos_token_id: Beginning of sequence token ID
         eos_token_id: End of sequence token ID
         pad_token_id: Padding token ID
-        **kwargs: Additional config overrides
+        **kwargs: Additional config overrides including:
+            - use_moe: Enable MOE (default: False)
+            - moe_type: Type of MOE ('standard', 'vqa', 'sparse')
+            - num_experts: Number of experts for standard MOE (default: 4)
+            - num_experts_per_token: Experts per token (default: 2)
+            - expert_capacity_factor: Capacity factor (default: 1.25)
+            - moe_loss_weight: Load balancing loss weight (default: 0.01)
+            - moe_position: Where to apply MOE ('fusion', 'decoder', 'both')
+            - num_vision_experts: VQA MOE vision experts (default: 2)
+            - num_text_experts: VQA MOE text experts (default: 2)
+            - num_multimodal_experts: VQA MOE multimodal experts (default: 2)
+            - num_specialized_experts: VQA MOE specialized experts (default: 2)
+            - vietnamese_optimized: Enable Vietnamese optimization (default: True)
     """
     config = GenerativeVQAConfig(
         visual_backbone=visual_backbone,
@@ -653,6 +773,22 @@ def get_default_generative_vqa_config(
         fusion_num_layers=2,
         fusion_dropout=0.1,
         
+        # MOE configuration
+        use_moe=kwargs.get('use_moe', False),
+        moe_type=kwargs.get('moe_type', 'standard'),  # 'standard', 'vqa', 'sparse'
+        num_experts=kwargs.get('num_experts', 4),
+        num_experts_per_token=kwargs.get('num_experts_per_token', 2),
+        expert_capacity_factor=kwargs.get('expert_capacity_factor', 1.25),
+        moe_loss_weight=kwargs.get('moe_loss_weight', 0.01),
+        moe_position=kwargs.get('moe_position', 'fusion'),
+        
+        # VQA MOE specific - specialized experts
+        num_vision_experts=kwargs.get('num_vision_experts', 2),
+        num_text_experts=kwargs.get('num_text_experts', 2),
+        num_multimodal_experts=kwargs.get('num_multimodal_experts', 2),
+        num_specialized_experts=kwargs.get('num_specialized_experts', 2),
+        vietnamese_optimized=kwargs.get('vietnamese_optimized', True),
+        
         vocab_size=vocab_size,
         pad_token_id=pad_token_id,
         bos_token_id=bos_token_id,
@@ -663,8 +799,13 @@ def get_default_generative_vqa_config(
     )
     
     # Apply any additional overrides that weren't handled above
+    handled_keys = ['freeze_visual_encoder', 'freeze_question_encoder', 'max_answer_length',
+                    'use_moe', 'moe_type', 'num_experts', 'num_experts_per_token', 
+                    'expert_capacity_factor', 'moe_loss_weight', 'moe_position',
+                    'num_vision_experts', 'num_text_experts', 'num_multimodal_experts',
+                    'num_specialized_experts', 'vietnamese_optimized']
     for key, value in kwargs.items():
-        if hasattr(config, key) and key not in ['freeze_visual_encoder', 'freeze_question_encoder', 'max_answer_length']:
+        if hasattr(config, key) and key not in handled_keys:
             setattr(config, key, value)
     
     # Re-sync aliased fields after kwargs
