@@ -1,0 +1,86 @@
+# Generative VQA Pipeline Configuration
+# This config file can be used with: python -m src.core.generative_vqa_pipeline --config configs/generative_configs.yaml
+
+# Pipeline mode: train, evaluate, inference, demo
+mode: train
+
+# Data Configuration
+data:
+  images_dir: data/raw/images
+  text_file: data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv
+  batch_size: 8  # Reduced for RTX 3060 with VQA MOE
+  max_question_length: 128
+  max_answer_length: 64
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  num_workers: 4
+
+# Model Configuration
+model:
+  visual_backbone: openai/clip-vit-base-patch32
+  text_encoder: vinai/phobert-base
+  hidden_size: 768
+  num_decoder_layers: 6
+  num_attention_heads: 8
+  freeze_visual_encoder: true
+  freeze_question_encoder: true
+
+# Mixture of Experts Configuration (Optional)
+moe:
+  enabled: true
+  type: standard  # 'standard' (FeedForward experts - lighter), 'vqa' (specialized - heavier)
+  position: fusion  # 'fusion', 'decoder', 'both'
+  num_experts: 8  # for standard MOE - uses FeedForwardExpert which is much lighter
+  capacity_factor: 1.25
+  loss_weight: 0.01
+  
+  # VQA MOE Specialized Experts (when type: vqa - DISABLED for RTX 3060)
+  # Note: Specialized experts are HEAVY (~140M params each for SegmentationExpert)
+  # Use type: standard for GPUs with <= 12GB VRAM
+  num_vision_experts: 1        # 👁️ VisionExpert - visual feature processing
+  num_text_experts: 1          # 📝 TextExpert - text/question understanding
+  num_multimodal_experts: 1    # 🔗 MultimodalExpert - cross-modal reasoning
+  num_specialized_experts: 1   # 🎯 One specialized expert (cycles through types)
+  vietnamese_optimized: true   # Enable Vietnamese text optimization in OCR expert
+
+# Knowledge Base / RAG Configuration (Optional)
+knowledge:
+  enabled: false
+  path: null
+  top_k: 3
+
+# Training Configuration
+training:
+  num_epochs: 20
+  learning_rate: 0.00005  # 5e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.1
+  use_amp: true
+  gradient_accumulation_steps: 2
+  early_stopping: true
+  patience: 5
+
+# Generation Configuration
+generation:
+  max_length: 64
+  num_beams: 1
+  do_sample: false
+  temperature: 1.0
+  top_k: 50
+  top_p: 0.95
+
+# Paths
+output_dir: outputs/generative
+checkpoint_dir: checkpoints/generative
+log_dir: logs/generative_pipeline
+
+# Resume from checkpoint (optional)
+resume_from: null
+
+# Resource Management
+enable_resource_management: true
+resource_config_path: null
+
+# Random seed
+seed: 42

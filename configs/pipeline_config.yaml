@@ -1,0 +1,150 @@
+# =============================================================================
+# Vietnamese VQA Pipeline Configuration
+# Complete configuration file for training
+# =============================================================================
+
+# Pipeline mode: train, evaluate, inference
+mode: train
+
+# Output settings
+output_dir: outputs
+log_dir: logs/pipeline
+
+# Resume from checkpoint (optional)
+resume_from: null
+
+# =============================================================================
+# Data Configuration
+# =============================================================================
+data:
+  # Data paths
+  images_dir: data/raw/images
+  text_file: data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv
+  
+  # Split ratios
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  
+  # DataLoader settings
+  batch_size: 32
+  eval_batch_size: 64
+  num_workers: 4
+  pin_memory: true
+  
+  # Image settings
+  image_size: [224, 224]
+  normalize_mean: [0.485, 0.456, 0.406]
+  normalize_std: [0.229, 0.224, 0.225]
+  
+  # Augmentation: light, medium, strong
+  augmentation_strength: medium
+  
+  # Tokenizer
+  tokenizer_name: vinai/phobert-base
+  max_seq_length: 64
+  
+  # Answer vocabulary
+  min_answer_freq: 5
+  
+  # Validation logging
+  validate_samples: 5
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+model:
+  # Visual encoder
+  visual_backbone: vit  # vit, resnet, clip, swin
+  visual_model_name: openai/clip-vit-base-patch32
+  visual_output_dim: 768
+  freeze_visual: false
+  
+  # Text encoder
+  text_encoder_type: phobert  # phobert, bert, roberta
+  text_model_name: vinai/phobert-base
+  text_output_dim: 768
+  text_max_length: 64
+  freeze_text: false
+  
+  # Fusion
+  fusion_type: cross_attention  # cross_attention, concat, bilinear
+  fusion_hidden_dim: 768
+  fusion_num_heads: 8
+  fusion_num_layers: 2
+  fusion_dropout: 0.1
+  
+  # Mixture of Experts (MOE)
+  use_moe: false
+  moe_type: standard  # standard, vqa, sparse
+  moe_num_experts: 8
+  moe_top_k: 2
+  moe_hidden_dim: 2048
+  moe_load_balance_weight: 0.01
+  moe_position: fusion  # fusion, decoder, both
+  
+  # VQA MOE Specialized Experts (when moe_type: vqa)
+  num_vision_experts: 2        # Visual processing experts
+  num_text_experts: 2          # Text processing experts
+  num_multimodal_experts: 2    # Cross-modal experts
+  num_specialized_experts: 2   # Task-specific experts (Segmentation, Detection, OCR, etc.)
+  vietnamese_optimized: true   # Enable Vietnamese text optimization in OCR expert
+  
+  # Knowledge/RAG
+  use_knowledge: false
+  knowledge_num_contexts: 5
+  knowledge_retriever_type: dense
+  
+  # Answer head
+  num_answers: 3000  # Will be overridden by data pipeline
+  answer_hidden_dims: [768, 512]
+  answer_dropout: 0.3
+  
+  # General
+  embed_dim: 768
+  dropout: 0.1
+  
+  # Device: auto, cuda, cpu
+  device: auto
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+training:
+  # Training settings
+  num_epochs: 20
+  gradient_accumulation_steps: 2
+  max_grad_norm: 1.0
+  
+  # Optimizer
+  optimizer_name: adamw  # adam, adamw, sgd
+  learning_rate: 2.0e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  
+  # Scheduler
+  scheduler_name: cosine  # cosine, linear, step
+  warmup_ratio: 0.1
+  warmup_steps: 0
+  
+  # Mixed precision
+  use_amp: true
+  amp_dtype: float16  # float16, bfloat16
+  
+  # Early stopping
+  early_stopping: true
+  patience: 5
+  min_delta: 0.001
+  
+  # Checkpointing
+  checkpoint_dir: checkpoints
+  save_best: true
+  save_every_epoch: true
+  metric_for_best: accuracy
+  
+  # Logging
+  log_interval: 50  # Log every N steps
+  eval_interval: 1  # Evaluate every N epochs
+  
+  # Reproducibility
+  seed: 42

@@ -1,0 +1,73 @@
+# =============================================================================
+# Checkpoint Configuration
+# Configuration for model checkpoint saving and loading
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Save Settings
+# -----------------------------------------------------------------------------
+save:
+  base_dir: "checkpoints"         # Base directory for checkpoints
+  
+  # Checkpoint naming
+  prefix: "vqa_model"             # Checkpoint file prefix
+  timestamp_format: "%Y%m%d_%H%M%S"  # Timestamp format for checkpoint names
+  
+  # Save triggers
+  save_best: true                 # Save best model based on metric
+  save_last: true                 # Save last model at training end
+  save_on_interrupt: true         # Save on training interruption (Ctrl+C)
+  
+  # Periodic saving
+  save_every_k_epochs: 5          # Save every k epochs (0 to disable)
+  save_every_k_steps: 0           # Save every k steps (0 to disable)
+  
+  # Checkpoint retention
+  max_keep: 3                     # Maximum number of checkpoints to keep
+  keep_best: true                 # Always keep best checkpoint regardless of max_keep
+  
+  # What to save
+  save_optimizer: true            # Include optimizer state
+  save_scheduler: true            # Include scheduler state
+  save_scaler: true               # Include gradient scaler state (for mixed precision)
+  save_early_stopping: true       # Include early stopping state
+  save_training_state: true       # Include training state (epoch, step, etc.)
+  save_config: true               # Include model and training config
+
+# -----------------------------------------------------------------------------
+# Best Model Settings
+# -----------------------------------------------------------------------------
+best_model:
+  metric: "accuracy"              # Metric to use for best model selection
+  mode: "max"                     # Mode: max (higher is better), min (lower is better)
+  filename: "best_model.pt"       # Filename for best model checkpoint
+
+# -----------------------------------------------------------------------------
+# Load Settings
+# -----------------------------------------------------------------------------
+load:
+  resume_from: null               # Path to checkpoint to resume training from
+  load_weights_only: false        # Load only model weights (ignore optimizer, scheduler, etc.)
+  strict_loading: true            # Require all keys to match when loading weights
+  
+  # Selective loading
+  load_optimizer: true            # Load optimizer state when resuming
+  load_scheduler: true            # Load scheduler state when resuming
+  load_scaler: true               # Load gradient scaler state when resuming
+  load_early_stopping: true       # Load early stopping state when resuming
+  
+  # Inference loading
+  inference_checkpoint: null      # Default checkpoint for inference
+
+# -----------------------------------------------------------------------------
+# Checkpoint Structure
+# -----------------------------------------------------------------------------
+# The checkpoint file contains the following keys:
+# - model_state_dict: Model weights
+# - optimizer_state_dict: Optimizer state (if save_optimizer=true)
+# - scheduler_state_dict: Scheduler state (if save_scheduler=true)
+# - scaler_state_dict: Gradient scaler state (if save_scaler=true)
+# - early_stopping_state: Early stopping state (if save_early_stopping=true)
+# - training_state: Dict with epoch, global_step, best_metric
+# - config: Model and training configuration (if save_config=true)
+# - metadata: Checkpoint metadata (timestamp, pytorch version, etc.)

@@ -1,0 +1,15 @@
+{
+  "report_id": "combined_20260109_224706_1",
+  "report_type": "combined",
+  "timestamp": "2026-01-09T22:47:06.843836",
+  "title": "Combined System Status Report",
+  "summary": "Combined system report. ",
+  "data": {
+    "generated_at": "2026-01-09T22:47:06.843830"
+  },
+  "metadata": {
+    "has_resources": false,
+    "has_tasks": true,
+    "has_additional": false
+  }
+}

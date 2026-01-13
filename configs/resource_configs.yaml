@@ -1,0 +1,78 @@
+# =============================================================================
+# Resource Management Configuration
+# Configuration for resource monitoring, auto-backup, and reporting
+# =============================================================================
+
+resource_management:
+  # ---------------------------------------------------------------------------
+  # General Settings
+  # ---------------------------------------------------------------------------
+  enable_monitoring: true           # Enable resource monitoring
+  enable_auto_shutdown: true        # Enable automatic shutdown on critical threshold
+  shutdown_grace_period_seconds: 30 # Grace period before forced shutdown
+  log_level: "INFO"                 # Logging level: DEBUG, INFO, WARNING, ERROR
+
+  # ---------------------------------------------------------------------------
+  # Resource Thresholds
+  # Thresholds for triggering warnings and critical actions
+  # ---------------------------------------------------------------------------
+  thresholds:
+    # CPU thresholds
+    cpu_warning_percent: 70.0       # Warning issued at this CPU usage
+    cpu_critical_percent: 90.0      # Critical action at this CPU usage
+    
+    # Memory (RAM) thresholds
+    memory_warning_percent: 70.0    # Warning issued at this memory usage
+    memory_critical_percent: 90.0   # Critical action at this memory usage
+    
+    # GPU memory thresholds
+    gpu_memory_warning_percent: 70.0   # Warning issued at this GPU memory usage
+    gpu_memory_critical_percent: 90.0  # Critical action at this GPU memory usage
+    
+    # Disk thresholds
+    disk_warning_percent: 80.0      # Warning issued at this disk usage
+    disk_critical_percent: 95.0     # Critical action at this disk usage
+    
+    # Action to take when critical threshold is exceeded
+    # Options: warn, backup, shutdown, backup_and_shutdown
+    critical_action: "backup_and_shutdown"
+
+  # ---------------------------------------------------------------------------
+  # Monitoring Intervals
+  # How frequently to check each resource type (in seconds)
+  # ---------------------------------------------------------------------------
+  intervals:
+    cpu_seconds: 5.0                # CPU monitoring interval
+    memory_seconds: 5.0             # Memory monitoring interval
+    gpu_seconds: 5.0                # GPU monitoring interval
+    disk_seconds: 60.0              # Disk monitoring interval (less frequent)
+    aggregate_seconds: 10.0         # Aggregate metrics collection interval
+
+  # ---------------------------------------------------------------------------
+  # Automatic Backup Configuration
+  # Settings for emergency checkpoint backup
+  # ---------------------------------------------------------------------------
+  backup:
+    enabled: true                   # Enable automatic backup
+    backup_dir: "checkpoints/emergency_backups"  # Backup directory
+    max_backups: 5                  # Maximum number of backup files to keep
+    backup_on_warning: false        # Create backup on warning threshold
+    backup_on_critical: true        # Create backup on critical threshold
+    include_optimizer_state: true   # Include optimizer state in backup
+    include_scheduler_state: true   # Include scheduler state in backup
+    compress_backup: false          # Compress backup files (gzip)
+
+  # ---------------------------------------------------------------------------
+  # Report Configuration
+  # Settings for automatic report generation and saving
+  # ---------------------------------------------------------------------------
+  report:
+    enabled: true                   # Enable automatic reporting
+    report_dir: "logs/resource_reports"  # Report directory
+    report_format: "json"           # Report format: json, yaml, csv
+    auto_save_interval_minutes: 30  # Auto-save interval in minutes
+    include_resource_history: true  # Include historical resource usage
+    include_progress_history: true  # Include historical progress data
+    max_history_entries: 1000       # Maximum history entries to store
+    save_on_shutdown: true          # Save report on shutdown
+    save_on_exception: true         # Save report on exception

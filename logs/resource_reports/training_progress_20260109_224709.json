@@ -1,0 +1,47 @@
+{
+  "report_id": "training_progress_20260109_224709_2",
+  "report_type": "training_progress",
+  "timestamp": "2026-01-09T22:47:09.230290",
+  "title": "Training Progress Report",
+  "summary": "Tracking 1 tasks.",
+  "data": {
+    "tasks": {
+      "task_1_1767973627": {
+        "task_id": "task_1_1767973627",
+        "name": "VQA Training",
+        "status": "completed",
+        "priority": "high",
+        "total_steps": 1260,
+        "current_step": 1260,
+        "start_time": "2026-01-09T22:47:07.042763",
+        "end_time": "2026-01-09T22:47:09.230201",
+        "estimated_completion": null,
+        "progress_percent": 100.0,
+        "metadata": {
+          "batch_size": 16,
+          "learning_rate": 2e-05,
+          "model_params": 773131960,
+          "mixed_precision": "fp16",
+          "task_type": "training",
+          "total_epochs": 20,
+          "steps_per_epoch": 63,
+          "current_epoch": 0,
+          "final_metrics": {
+            "accuracy": 0.0,
+            "best_epoch": 0
+          },
+          "total_duration_seconds": 2.187438
+        },
+        "error_message": null
+      }
+    },
+    "task_count": 1,
+    "status_summary": {
+      "completed": 1
+    }
+  },
+  "metadata": {
+    "active_task_count": 0,
+    "has_history": false
+  }
+}

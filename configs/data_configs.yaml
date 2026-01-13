@@ -1,0 +1,23 @@
+data_path:
+  raw_data: data/raw/
+  raw_images: data/raw/images/
+  raw_texts: data/raw/texts/
+  processed_data: 
+    folder: data/processed/
+    train_data:
+      folder: data/processed/train/
+      images_folder: data/processed/train/images/
+      texts_folder: data/processed/train/texts/
+    val_data:
+      folder: data/processed/val/
+      images_folder: data/processed/val/images/
+      texts_folder: data/processed/val/texts/
+    test_data:
+      folder: data/processed/test/
+      images_folder: data/processed/test/images/
+      texts_folder: data/processed/test/texts/
+
+kaggle_setup:
+  kaggle_project: 'nguynrichard/auto-vqabest'
+  images_folder: preprocessed_images/
+  text_file: text/evaluate_60k_data_balanced_preprocessed.csv

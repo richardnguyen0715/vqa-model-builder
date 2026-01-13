@@ -1,0 +1,58 @@
+version: 1
+disable_existing_loggers: false
+
+formatters:
+  default:
+    format: '%(asctime)s - %(name)s - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  data_loader:
+    format: '%(asctime)s - DATA_LOADER - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  model_builder:
+    format: '%(asctime)s - model_builder - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+  data_process:
+    format: '%(asctime)s - DATA_PROCESS - %(levelname)s - [%(pathname)s:%(lineno)d - %(funcName)s()] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+handlers:
+  data_loader_file:
+    class: logging.FileHandler
+    formatter: data_loader
+    filename: logs/data_loader/data_loader.log
+    level: DEBUG
+    encoding: utf-8
+  model_builder_file:
+    class: logging.FileHandler
+    formatter: model_builder
+    filename: logs/model_builder/model_builder.log
+    level: DEBUG
+    encoding: utf-8
+  data_process_file:
+    class: logging.FileHandler
+    formatter: data_process
+    filename: logs/data_process/data_process.log
+    level: DEBUG
+    encoding: utf-8
+  console:
+    class: logging.StreamHandler
+    formatter: default
+    level: INFO
+
+loggers:
+  data_loader_logger:
+    level: DEBUG
+    handlers: [data_loader_file, console]
+    propagate: false
+  model_builder_logger:
+    level: DEBUG
+    handlers: [model_builder_file, console]
+    propagate: false
+  data_process_logger:
+    level: DEBUG
+    handlers: [data_process_file, console]
+    propagate: false
+
+root:
+  level: INFO
+  handlers: [console]
