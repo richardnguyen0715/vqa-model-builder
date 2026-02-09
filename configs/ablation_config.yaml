@@ -1,0 +1,103 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Ablation Study Configuration
+# AutoViVQA Model Builder — MOE Ablation Pipeline
+# ═══════════════════════════════════════════════════════════════════════════
+
+ablation:
+  name: "moe_ablation_study"
+
+  # ── Search Space ──────────────────────────────────────────────────────
+  search_space:
+    # Expert types to ablate
+    expert_types:
+      - "vision"
+      - "text"
+      - "multimodal"
+      - "specialized"
+
+    # Which ablation experiments to generate
+    run_single_expert: true        # One expert type only (4 experiments)
+    run_leave_one_out: true        # Remove one type at a time (4 experiments)
+    run_subsets: true              # Subset combinations (6 experiments for pairs, 4 for triples)
+    include_no_moe_baseline: true  # No MOE at all (1 experiment)
+    include_full_baseline: true    # All experts enabled (1 experiment)
+
+    # Subset limits (controls combinatorial explosion)
+    min_subset_size: 2
+    max_subset_size: 3
+
+    # Router ablation space
+    router_types:
+      - "topk"
+      - "noisy_topk"
+      - "soft"
+      - "expert_choice"
+
+    top_k_values: [1, 2, 4]
+    load_balance_weights: [0.0, 0.01, 0.1]
+    capacity_factors: [1.0, 1.25, 1.5]
+
+    # Cross-product control:
+    #   - false: Expert ablation with default router + Router ablation on full baseline
+    #   - true:  Every expert config × every router config (large matrix!)
+    cross_expert_router: false
+
+    # Default expert counts per type (matches VQAMOELayer defaults)
+    num_experts_per_type:
+      vision: 2
+      text: 2
+      multimodal: 2
+      specialized: 2
+
+  # ── Training Settings (defaults, can be overridden per experiment) ──
+  num_epochs: 10
+  learning_rate: 2.0e-5
+  batch_size: 8              # Reduced for RTX 3060 (12GB). Effective batch = batch_size × grad_accum = 32
+  eval_batch_size: 32
+  seed: 42
+  use_amp: true
+  gradient_accumulation_steps: 4   # Compensates for smaller batch_size (8 × 4 = 32 effective)
+  early_stopping: true
+  patience: 5
+
+  # ── Data Settings ─────────────────────────────────────────────────────
+  images_dir: "data/raw/images"
+  text_file: "data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv"
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+
+  # ── Model Settings ────────────────────────────────────────────────────
+  visual_backbone: "vit"
+  visual_model_name: "openai/clip-vit-base-patch32"
+  text_encoder_type: "phobert"
+  text_model_name: "vinai/phobert-base"
+  fusion_type: "cross_attention"
+  embed_dim: 768
+  moe_hidden_dim: 2048
+
+  # ── Output Directories ───────────────────────────────────────────────
+  output_dir: "outputs/ablation"
+  checkpoint_dir: "checkpoints/ablation"
+  log_dir: "logs/ablation"
+
+  # ── Execution ─────────────────────────────────────────────────────────
+  resume: true           # Skip completed experiments on re-run
+  max_parallel: 1        # Sequential execution (1 GPU)
+
+  # ── Explicit Experiments (optional) ───────────────────────────────────
+  # Add manually specified experiments here. They're appended to the
+  # auto-generated matrix. Useful for testing specific configurations.
+  explicit_experiments: []
+  # Example:
+  #   - experiment_id: "custom_vision_only_soft_router"
+  #     expert_config:
+  #       mode: "single_expert"
+  #       active_experts: ["vision"]
+  #     router_config:
+  #       router_type: "soft"
+  #       top_k: 2
+  #       load_balance_weight: 0.05
+  #     num_epochs: 15
+  #     seed: 42
+  #     tags: ["custom"]

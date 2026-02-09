@@ -1,0 +1,1089 @@
+{
+  "study_name": "moe_ablation_study",
+  "generated_at": "2026-02-09T21:16:01.926370",
+  "num_experiments": 27,
+  "experiments": [
+    {
+      "experiment_id": "full__noisy_topk_k2",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "full",
+        "router_noisy_topk"
+      ],
+      "priority": 10
+    },
+    {
+      "experiment_id": "no_moe__noisy_topk_k2",
+      "expert_config": {
+        "mode": "no_moe",
+        "active_experts": [],
+        "disabled_experts": [
+          "multimodal",
+          "specialized",
+          "text",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 0,
+          "multimodal": 0,
+          "specialized": 0
+        },
+        "description": "No MOE"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "no_moe"
+      ],
+      "priority": 9
+    },
+    {
+      "experiment_id": "leave_one_out_no_multimodal__noisy_topk_k2",
+      "expert_config": {
+        "mode": "leave_one_out",
+        "active_experts": [
+          "vision",
+          "text",
+          "specialized"
+        ],
+        "disabled_experts": [
+          "multimodal"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 0,
+          "specialized": 2
+        },
+        "description": "LOO: -multimodal"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "leave_one_out",
+        "router_noisy_topk"
+      ],
+      "priority": 8
+    },
+    {
+      "experiment_id": "leave_one_out_no_specialized__noisy_topk_k2",
+      "expert_config": {
+        "mode": "leave_one_out",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal"
+        ],
+        "disabled_experts": [
+          "specialized"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 0
+        },
+        "description": "LOO: -specialized"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "leave_one_out",
+        "router_noisy_topk"
+      ],
+      "priority": 8
+    },
+    {
+      "experiment_id": "leave_one_out_no_text__noisy_topk_k2",
+      "expert_config": {
+        "mode": "leave_one_out",
+        "active_experts": [
+          "vision",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [
+          "text"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 0,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "LOO: -text"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "leave_one_out",
+        "router_noisy_topk"
+      ],
+      "priority": 8
+    },
+    {
+      "experiment_id": "leave_one_out_no_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "leave_one_out",
+        "active_experts": [
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "LOO: -vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "leave_one_out",
+        "router_noisy_topk"
+      ],
+      "priority": 8
+    },
+    {
+      "experiment_id": "single_expert_multimodal__noisy_topk_k2",
+      "expert_config": {
+        "mode": "single_expert",
+        "active_experts": [
+          "multimodal"
+        ],
+        "disabled_experts": [
+          "specialized",
+          "text",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 0,
+          "multimodal": 2,
+          "specialized": 0
+        },
+        "description": "Single: multimodal"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "single_expert",
+        "router_noisy_topk"
+      ],
+      "priority": 7
+    },
+    {
+      "experiment_id": "single_expert_specialized__noisy_topk_k2",
+      "expert_config": {
+        "mode": "single_expert",
+        "active_experts": [
+          "specialized"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "text",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 0,
+          "multimodal": 0,
+          "specialized": 2
+        },
+        "description": "Single: specialized"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "single_expert",
+        "router_noisy_topk"
+      ],
+      "priority": 7
+    },
+    {
+      "experiment_id": "single_expert_text__noisy_topk_k2",
+      "expert_config": {
+        "mode": "single_expert",
+        "active_experts": [
+          "text"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "specialized",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 2,
+          "multimodal": 0,
+          "specialized": 0
+        },
+        "description": "Single: text"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "single_expert",
+        "router_noisy_topk"
+      ],
+      "priority": 7
+    },
+    {
+      "experiment_id": "single_expert_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "single_expert",
+        "active_experts": [
+          "vision"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "specialized",
+          "text"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 0,
+          "multimodal": 0,
+          "specialized": 0
+        },
+        "description": "Single: vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "single_expert",
+        "router_noisy_topk"
+      ],
+      "priority": 7
+    },
+    {
+      "experiment_id": "full__expert_choice_k1",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "expert_choice",
+        "top_k": 1,
+        "noise_enabled": false,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=expert_choice | K=1 | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__noisy_topk_k1",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 1,
+        "noise_enabled": true,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=noisy_topk | K=1 | noise=on | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__noisy_topk_k4",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 4,
+        "noise_enabled": true,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=noisy_topk | K=4 | noise=on | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__soft_k1",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "soft",
+        "top_k": 1,
+        "noise_enabled": false,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=soft | K=1 | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__topk_k1",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "topk",
+        "top_k": 1,
+        "noise_enabled": false,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=topk | K=1 | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__topk_k2",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "topk",
+        "top_k": 2,
+        "noise_enabled": false,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=topk | K=2 | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "full__topk_k4",
+      "expert_config": {
+        "mode": "full",
+        "active_experts": [
+          "vision",
+          "text",
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Baseline (all experts)"
+      },
+      "router_config": {
+        "router_type": "topk",
+        "top_k": 4,
+        "noise_enabled": false,
+        "load_balance_weight": 0.0,
+        "capacity_factor": 1.0,
+        "description": "Router=topk | K=4 | lb=0.0"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "router_ablation"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_specialized__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "specialized"
+        ],
+        "disabled_experts": [
+          "text",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 0,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Subset: multimodal+specialized"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_specialized_text__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "specialized",
+          "text"
+        ],
+        "disabled_experts": [
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Subset: multimodal+specialized+text"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_specialized_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "specialized",
+          "vision"
+        ],
+        "disabled_experts": [
+          "text"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 0,
+          "multimodal": 2,
+          "specialized": 2
+        },
+        "description": "Subset: multimodal+specialized+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_text__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "text"
+        ],
+        "disabled_experts": [
+          "specialized",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 0
+        },
+        "description": "Subset: multimodal+text"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_text_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "text",
+          "vision"
+        ],
+        "disabled_experts": [
+          "specialized"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 2,
+          "specialized": 0
+        },
+        "description": "Subset: multimodal+text+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_multimodal_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "multimodal",
+          "vision"
+        ],
+        "disabled_experts": [
+          "specialized",
+          "text"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 0,
+          "multimodal": 2,
+          "specialized": 0
+        },
+        "description": "Subset: multimodal+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_specialized_text__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "specialized",
+          "text"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "vision"
+        ],
+        "num_experts_per_type": {
+          "vision": 0,
+          "text": 2,
+          "multimodal": 0,
+          "specialized": 2
+        },
+        "description": "Subset: specialized+text"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_specialized_text_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "specialized",
+          "text",
+          "vision"
+        ],
+        "disabled_experts": [
+          "multimodal"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 0,
+          "specialized": 2
+        },
+        "description": "Subset: specialized+text+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_specialized_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "specialized",
+          "vision"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "text"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 0,
+          "multimodal": 0,
+          "specialized": 2
+        },
+        "description": "Subset: specialized+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    },
+    {
+      "experiment_id": "subset_text_vision__noisy_topk_k2",
+      "expert_config": {
+        "mode": "subset",
+        "active_experts": [
+          "text",
+          "vision"
+        ],
+        "disabled_experts": [
+          "multimodal",
+          "specialized"
+        ],
+        "num_experts_per_type": {
+          "vision": 2,
+          "text": 2,
+          "multimodal": 0,
+          "specialized": 0
+        },
+        "description": "Subset: text+vision"
+      },
+      "router_config": {
+        "router_type": "noisy_topk",
+        "top_k": 2,
+        "noise_enabled": true,
+        "load_balance_weight": 0.01,
+        "capacity_factor": 1.25,
+        "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+      },
+      "num_epochs": 10,
+      "learning_rate": 2e-05,
+      "batch_size": 8,
+      "seed": 42,
+      "tags": [
+        "subset",
+        "router_noisy_topk"
+      ],
+      "priority": 5
+    }
+  ],
+  "config": {
+    "name": "moe_ablation_study",
+    "search_space": {
+      "expert_types": [
+        "vision",
+        "text",
+        "multimodal",
+        "specialized"
+      ],
+      "run_single_expert": true,
+      "run_leave_one_out": true,
+      "run_subsets": true,
+      "max_subset_size": 3,
+      "min_subset_size": 2,
+      "include_no_moe_baseline": true,
+      "include_full_baseline": true,
+      "router_types": [
+        "topk",
+        "noisy_topk",
+        "soft",
+        "expert_choice"
+      ],
+      "top_k_values": [
+        1,
+        2,
+        4
+      ],
+      "load_balance_weights": [
+        0.0,
+        0.01,
+        0.1
+      ],
+      "capacity_factors": [
+        1.0,
+        1.25,
+        1.5
+      ],
+      "cross_expert_router": false,
+      "num_experts_per_type": {
+        "vision": 2,
+        "text": 2,
+        "multimodal": 2,
+        "specialized": 2
+      }
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 8,
+    "eval_batch_size": 32,
+    "seed": 42,
+    "use_amp": true,
+    "gradient_accumulation_steps": 4,
+    "early_stopping": true,
+    "patience": 5,
+    "images_dir": "data/raw/images",
+    "text_file": "data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv",
+    "train_ratio": 0.8,
+    "val_ratio": 0.1,
+    "test_ratio": 0.1,
+    "visual_backbone": "vit",
+    "visual_model_name": "openai/clip-vit-base-patch32",
+    "text_encoder_type": "phobert",
+    "text_model_name": "vinai/phobert-base",
+    "fusion_type": "cross_attention",
+    "embed_dim": 768,
+    "moe_hidden_dim": 2048,
+    "output_dir": "outputs/ablation",
+    "checkpoint_dir": "checkpoints/ablation",
+    "log_dir": "logs/ablation",
+    "resume": false,
+    "max_parallel": 1,
+    "explicit_experiments": []
+  }
+}

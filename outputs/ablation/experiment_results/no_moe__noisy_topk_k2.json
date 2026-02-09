@@ -1,0 +1,49 @@
+{
+  "experiment_id": "no_moe__noisy_topk_k2",
+  "experiment_config": {
+    "experiment_id": "no_moe__noisy_topk_k2",
+    "expert_config": {
+      "mode": "no_moe",
+      "active_experts": [],
+      "disabled_experts": [
+        "multimodal",
+        "specialized",
+        "text",
+        "vision"
+      ],
+      "num_experts_per_type": {
+        "vision": 0,
+        "text": 0,
+        "multimodal": 0,
+        "specialized": 0
+      },
+      "description": "No MOE"
+    },
+    "router_config": {
+      "router_type": "noisy_topk",
+      "top_k": 2,
+      "noise_enabled": true,
+      "load_balance_weight": 0.01,
+      "capacity_factor": 1.25,
+      "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 8,
+    "seed": 42,
+    "tags": [
+      "no_moe"
+    ],
+    "priority": 9
+  },
+  "metrics": {},
+  "moe_metrics": {},
+  "training_history": [],
+  "validation_history": [],
+  "total_epochs": 0,
+  "training_time": 314.4101047515869,
+  "best_metric": 0.0,
+  "checkpoint_path": "",
+  "status": "failed",
+  "error_message": "ImportError: NLTK required for BLEU. Install with: pip install nltk\nTraceback (most recent call last):\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/solvers/metrics/vqa_metrics.py\", line 622, in compute\n    from nltk.translate.bleu_score import corpus_bleu, SmoothingFunction\nModuleNotFoundError: No module named 'nltk'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/ablation/ablation_trainer.py\", line 468, in run_experiment\n    output = pipeline.run()\n             ^^^^^^^^^^^^^^\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/core/training_pipeline.py\", line 190, in run\n    self._training_loop()\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/core/training_pipeline.py\", line 411, in _training_loop\n    val_metrics = self._validate_epoch()\n                  ^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/core/training_pipeline.py\", line 692, in _validate_epoch\n    bleu_result = bleu_metric.compute()\n                  ^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/tuongnguyendev/Coding/AutovivqaModelBuilder/src/solvers/metrics/vqa_metrics.py\", line 624, in compute\n    raise ImportError(\"NLTK required for BLEU. Install with: pip install nltk\")\nImportError: NLTK required for BLEU. Install with: pip install nltk\n"
+}

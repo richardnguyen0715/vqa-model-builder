@@ -22,168 +22,261 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.9+-ee4c2c.svg)](https://pytorch.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**A comprehensive Vietnamese Visual Question Answering system with state-of-the-art features**
+**Hệ thống Visual Question Answering tiếng Việt toàn diện với kiến trúc tiên tiến**
 
-[Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Architecture](#-architecture)
+[Tính năng](#-tính-năng) •
+[Cài đặt](#-cài-đặt) •
+[Bắt đầu nhanh](#-bắt-đầu-nhanh) •
+[Pipeline Guide](#-pipeline-guide) •
+[Tài liệu](#-tài-liệu-chi-tiết)
 
 </div>
 
 ---
 
-## 📋 Table of Contents
+## 📋 Mục lục
 
-- [Features](#-features)
-- [Architecture Overview](#-architecture-overview)
-- [Installation](#-installation)
-- [Quick Start](#-quick-start)
-- [Pipeline Usage](#-pipeline-usage)
-  - [Training](#training)
-  - [Evaluation](#evaluation)
-  - [Inference](#inference)
-- [Configuration](#-configuration)
-- [Project Structure](#-project-structure)
-- [Documentation](#-documentation)
-- [Development](#-development)
-- [License](#-license)
-
----
-
-## ✨ Features
-
-### 🎯 Core Capabilities
-
-| Feature | Description |
-|---------|-------------|
-| **Vietnamese NLP** | Optimized for Vietnamese with PhoBERT integration |
-| **Multiple Visual Backbones** | ViT, ResNet, CLIP, Swin Transformer |
-| **Multimodal Fusion** | Cross-Attention, Q-Former, Bilinear fusion strategies |
-| **Mixture of Experts (MOE)** | Dynamic routing to specialized expert networks |
-| **Knowledge Base/RAG** | Retrieval-Augmented Generation for external knowledge |
-| **Memory-Efficient** | Lazy image loading, AMP training |
-
-### 🔧 Technical Features
-
-- ✅ **End-to-end Pipeline** - Data loading → Model building → Training → Evaluation
-- ✅ **Comprehensive Logging** - Detailed validation at every step
-- ✅ **Resource Monitoring** - Real-time CPU, GPU, Memory tracking
-- ✅ **Checkpointing** - Auto-save best models with early stopping
-- ✅ **Mixed Precision** - FP16/BF16 training for faster performance
-- ✅ **CLI & Python API** - Flexible usage options
+- [Tính năng](#-tính-năng)
+- [Kiến trúc tổng quan](#-kiến-trúc-tổng-quan)
+- [Cài đặt](#-cài-đặt)
+- [Bắt đầu nhanh](#-bắt-đầu-nhanh)
+- [Pipeline Guide](#-pipeline-guide)
+  - [1. Chuẩn bị dữ liệu (Data Processing)](#1-chuẩn-bị-dữ-liệu-data-processing)
+  - [2. Huấn luyện (Training)](#2-huấn-luyện-training)
+  - [3. Đánh giá (Evaluation)](#3-đánh-giá-evaluation)
+  - [4. Suy luận (Inference)](#4-suy-luận-inference)
+  - [5. Generative VQA Pipeline](#5-generative-vqa-pipeline)
+  - [6. Ablation Study](#6-ablation-study)
+  - [7. Quản lý tài nguyên (Resource Management)](#7-quản-lý-tài-nguyên-resource-management)
+- [Cấu hình (Configuration)](#-cấu-hình-configuration)
+- [Cấu trúc dự án](#-cấu-trúc-dự-án)
+- [Tổng hợp lệnh thường dùng](#-tổng-hợp-lệnh-thường-dùng)
+- [Tài liệu chi tiết](#-tài-liệu-chi-tiết)
 
 ---
 
-## 🏗 Architecture Overview
+## 🌟 Tính năng
+
+| Thành phần | Chi tiết |
+|:----------:|:---------|
+| 🖼️ **Visual Encoders** | CLIP ViT-B/32, ResNet, Swin Transformer, DINOv2 |
+| 📝 **Text Encoders** | PhoBERT (tối ưu tiếng Việt), BERT, RoBERTa, BARTpho |
+| 🔗 **Multimodal Fusion** | Cross-Attention, Bilinear, MCAN, Concat, MuTAN |
+| 🧠 **Mixture of Experts** | VQA MOE Layer, 4 loại router, 6+ loại expert chuyên biệt |
+| 📚 **Knowledge Base / RAG** | FAISS vector store, dense/sparse/hybrid retriever |
+| 📊 **Metrics** | VQA Soft Accuracy, BLEU-4, METEOR, ROUGE-L, CIDEr, F1, WUPS |
+| 🔬 **Ablation Study** | Expert-level, Router-level, tự động báo cáo Markdown/CSV/LaTeX |
+| ⚡ **Training** | AMP FP16, gradient accumulation, early stopping, cosine warmup |
+| 🛡️ **Resource Management** | GPU/CPU/RAM monitoring, emergency backup, auto shutdown |
+| 🎯 **Dual Paradigm** | Classification VQA + Generative VQA (encoder-decoder) |
+
+---
+
+## 🏗 Kiến trúc tổng quan
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Vietnamese VQA Model                          │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐    │
-│  │   Image      │     │   Question   │     │  Knowledge   │    │
-│  │   Input      │     │   (Vietnamese)│     │    Base      │    │
-│  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘    │
-│         │                    │                    │              │
-│         ▼                    ▼                    ▼              │
-│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐    │
-│  │   Visual     │     │    Text      │     │     RAG      │    │
-│  │   Encoder    │     │   Encoder    │     │   Module     │    │
-│  │  (ViT/CLIP)  │     │  (PhoBERT)   │     │  (Retriever) │    │
-│  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘    │
-│         │                    │                    │              │
-│         └────────────┬───────┴────────────┬──────┘              │
-│                      ▼                                          │
-│              ┌──────────────────────────────────┐               │
-│              │     Multimodal Fusion            │               │
-│              │  (Cross-Attention / Q-Former)    │               │
-│              └──────────────┬───────────────────┘               │
-│                             ▼                                    │
-│              ┌──────────────────────────────────┐               │
-│              │    Mixture of Experts (MOE)      │               │
-│              │  ┌────┐ ┌────┐ ┌────┐ ┌────┐   │               │
-│              │  │ E1 │ │ E2 │ │ E3 │ │ E4 │   │               │
-│              │  └────┘ └────┘ └────┘ └────┘   │               │
-│              └──────────────┬───────────────────┘               │
-│                             ▼                                    │
-│              ┌──────────────────────────────────┐               │
-│              │        Answer Head               │               │
-│              └──────────────┬───────────────────┘               │
-│                             ▼                                    │
-│                      ┌──────────┐                               │
-│                      │  Answer  │                               │
-│                      └──────────┘                               │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        VQA Pipeline Orchestrator                    │
+│    (Classification: vqa_pipeline.py / Generative: generative_vqa)  │
+├──────────┬──────────────┬──────────────────┬────────────────────────┤
+│ Data     │ Model        │ Training         │ Evaluation             │
+│ Pipeline │ Pipeline     │ Pipeline         │ Pipeline               │
+├──────────┼──────────────┼──────────────────┼────────────────────────┤
+│ CSV+Img  │ VisualEnc    │ AdamW + Cosine   │ VQA Accuracy           │
+│ PhoBERT  │ TextEnc      │ AMP FP16         │ BLEU / METEOR          │
+│ Tokenize │ Fusion       │ Early Stopping   │ ROUGE-L / CIDEr        │
+│ Augment  │ MOE Layer    │ Grad Accumulate  │ Precision/Recall/F1    │
+│ Split    │ Knowledge    │ Checkpointing    │ Per-type Analysis      │
+│ Loader   │ AnswerHead   │ Resource Mgmt    │ Confusion Matrix       │
+└──────────┴──────────────┴──────────────────┴────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    │    Ablation Study      │
+                    │  Expert / Router / MOE │
+                    │  Analysis & Reporting  │
+                    └───────────────────────┘
 ```
 
 ---
 
-## 💻 Installation
+## 📦 Cài đặt
 
-### Prerequisites
+### Yêu cầu hệ thống
 
-- Python 3.11+
-- CUDA 12.x (for GPU support)
-- 8GB+ RAM (16GB+ recommended)
-- NVIDIA GPU with 8GB+ VRAM (optional but recommended)
+- Python >= 3.11
+- CUDA >= 12.0 (khuyến nghị, hỗ trợ CPU nhưng chậm)
+- RAM >= 16 GB
+- VRAM >= 6 GB (RTX 3060 trở lên)
 
-### Step 1: Clone Repository
+### Cài đặt với Conda (khuyến nghị)
 
 ```bash
-git clone https://github.com/yourusername/AutovivqaModelBuilder.git
+# 1. Clone repo
+git clone https://github.com/your-username/AutovivqaModelBuilder.git
 cd AutovivqaModelBuilder
-```
 
-### Step 2: Create Environment
+# 2. Tạo môi trường
+conda create -n tgng.modelbuilder python=3.11 -y
+conda activate tgng.modelbuilder
 
-```bash
-# Using conda (recommended)
-conda create -n vqa python=3.11
-conda activate vqa
+# 3. Cài đặt PyTorch (CUDA 12.x)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
-# Or using venv
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-```
+# 4. Cài đặt project
+pip install -e .
 
-### Step 3: Install Dependencies
-
-```bash
-# Using poetry (recommended)
-pip install poetry
+# Hoặc với Poetry
 poetry install
-
-# Or using pip
-pip install -r requirements.txt
 ```
 
-### Step 4: Download Data
+### Cài đặt với venv
 
 ```bash
-# Using CLI script
-bash src/cli/download_data.sh
+python -m venv .venv
+source .venv/bin/activate
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install -e .
+```
 
-# Or using Python
-python -m src.data.download_data
+### Kiểm tra cài đặt
+
+```bash
+python -c "import torch; print(f'PyTorch {torch.__version__}, CUDA: {torch.cuda.is_available()}')"
+python -c "from src.core.vqa_pipeline import VQAPipeline; print('Import OK')"
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Bắt đầu nhanh
 
-### Option 1: One-Command Training
+### One-Command (Dùng shell script)
 
 ```bash
-# Download data + Train model (recommended for first time)
+# Quick start: download data + train
 bash src/cli/quick_start.sh
 ```
 
-### Option 2: CLI Training
+### Chạy từ YAML config
 
 ```bash
-# Basic training
-python -m src.core.vqa_pipeline --mode train --epochs 10 --batch-size 16
+# Dùng file config mặc định
+python -m src.core.vqa_pipeline --config configs/pipeline_config.yaml
+```
 
-# With all options
+### Chạy trực tiếp với tham số
+
+```bash
+python -m src.core.vqa_pipeline \
+    --mode train \
+    --images-dir data/raw/images \
+    --text-file data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv \
+    --visual-backbone vit \
+    --text-encoder phobert \
+    --epochs 20 \
+    --batch-size 32 \
+    --learning-rate 2e-5 \
+    --use-moe \
+    --output-dir outputs \
+    --seed 42
+```
+
+---
+
+## 📖 Pipeline Guide
+
+### 1. Chuẩn bị dữ liệu (Data Processing)
+
+#### 1.1 Tải dữ liệu từ Kaggle
+
+```bash
+# Tải dataset AutoViVQA từ Kaggle
+python -m src.data.download_data
+
+# Hoặc dùng shell script
+bash src/cli/download_data.sh
+```
+
+> **Yêu cầu:** Tạo file `~/.kaggle/kaggle.json` với API key từ [kaggle.com/settings](https://kaggle.com/settings).
+
+#### 1.2 Cấu trúc dữ liệu đầu vào
+
+```
+data/
+└── raw/
+    ├── images/          # Ảnh (JPG/PNG)
+    │   ├── image_001.jpg
+    │   ├── image_002.jpg
+    │   └── ...
+    └── texts/
+        └── evaluate_60k_data_balanced_preprocessed.csv
+```
+
+**Định dạng CSV** (3 cột bắt buộc):
+
+| Cột | Mô tả | Ví dụ |
+|-----|--------|-------|
+| `image_link` | Tên file ảnh | `image_001.jpg` |
+| `question` | Câu hỏi tiếng Việt | `Có bao nhiêu người trong ảnh?` |
+| `answers` | Danh sách đáp án (JSON/pipe-separated) | `["hai", "2", "hai người"]` |
+
+#### 1.3 Data Pipeline tự động
+
+Data pipeline xử lý 9 bước tự động khi chạy training:
+
+1. Load raw data (CSV + images)
+2. Validate data (kiểm tra file ảnh tồn tại)
+3. Compute statistics (phân tích phân phối)
+4. Split data (train 80% / val 10% / test 10%)
+5. Build answer vocabulary (min_freq = 5)
+6. Initialize tokenizer (PhoBERT)
+7. Build image transforms (augmentation)
+8. Create DataLoaders
+9. Validate DataLoaders
+
+**Tùy chỉnh data processing:**
+
+```bash
+python -m src.core.vqa_pipeline \
+    --mode train \
+    --images-dir /path/to/images \
+    --text-file /path/to/data.csv \
+    --batch-size 16
+```
+
+Hoặc chỉnh trong `configs/pipeline_config.yaml`:
+
+```yaml
+data:
+  images_dir: "data/raw/images"
+  text_file: "data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv"
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  batch_size: 32
+  eval_batch_size: 64
+  num_workers: 4
+  image_size: [224, 224]
+  augmentation_strength: "medium"   # light | medium | strong
+  tokenizer_name: "vinai/phobert-base"
+  max_seq_length: 64
+  min_answer_freq: 5
+```
+
+---
+
+### 2. Huấn luyện (Training)
+
+#### 2.1 Classification VQA (Phân loại đáp án)
+
+**Cách 1: YAML Config (khuyến nghị)**
+
+```bash
+python -m src.core.vqa_pipeline --config configs/pipeline_config.yaml --mode train
+```
+
+**Cách 2: CLI Arguments**
+
+```bash
 python -m src.core.vqa_pipeline \
     --mode train \
     --epochs 20 \
@@ -192,444 +285,766 @@ python -m src.core.vqa_pipeline \
     --visual-backbone vit \
     --text-encoder phobert \
     --use-moe \
-    --output-dir outputs
+    --output-dir outputs \
+    --seed 42
 ```
 
-### Option 3: Using Config File
+**Cách 3: Shell Script (với colored output)**
 
 ```bash
-# Use YAML configuration
-python -m src.core.vqa_pipeline --config configs/pipeline_config.yaml
-```
-
-### Option 4: Shell Script
-
-```bash
-# Using shell script with arguments
-bash src/cli/run_pipeline.sh --mode train --epochs 10 --batch-size 16
-
-# Or use clean mode (suppresses warnings)
-bash src/cli/run_clean.sh --mode train --epochs 10
-```
-
-### Option 5: Python API
-
-```python
-from src.core import VQAPipeline, VQAPipelineConfig
-from src.core import DataPipelineConfig, ModelPipelineConfig, TrainingPipelineConfig
-
-# Configure pipeline
-config = VQAPipelineConfig(
-    mode="train",
-    data=DataPipelineConfig(
-        images_dir="data/raw/images",
-        batch_size=16,
-    ),
-    model=ModelPipelineConfig(
-        visual_backbone="vit",
-        text_encoder_type="phobert",
-        use_moe=False,
-    ),
-    training=TrainingPipelineConfig(
-        num_epochs=10,
-        learning_rate=2e-5,
-    ),
-)
-
-# Run pipeline
-pipeline = VQAPipeline(config)
-results = pipeline.run()
-
-print(f"Best accuracy: {results.training_output.best_metric:.4f}")
-```
-
----
-
-## 📖 Pipeline Usage
-
-### Training
-
-#### Basic Training
-
-```bash
-python -m src.core.vqa_pipeline --mode train --epochs 10
-```
-
-#### Advanced Training with MOE
-
-```bash
-python -m src.core.vqa_pipeline \
+bash src/cli/run_pipeline.sh \
     --mode train \
     --epochs 20 \
     --batch-size 32 \
-    --use-moe \
-    --learning-rate 2e-5 \
-    --output-dir outputs/moe_experiment
+    --visual-backbone vit \
+    --text-encoder phobert \
+    --use-moe
 ```
 
-#### Training with Knowledge Base (RAG)
+**Cách 4: Python API**
+
+```python
+from src.core.vqa_pipeline import VQAPipeline, VQAPipelineConfig
+
+config = VQAPipelineConfig.from_yaml("configs/pipeline_config.yaml")
+config.mode = "train"
+
+pipeline = VQAPipeline(config)
+output = pipeline.run()
+
+print(f"Best VQA Accuracy: {output.training_output.best_metric:.4f}")
+print(f"Checkpoint: {output.training_output.best_model_path}")
+```
+
+#### 2.2 Resume Training (tiếp tục huấn luyện)
 
 ```bash
+# Resume từ checkpoint
 python -m src.core.vqa_pipeline \
     --mode train \
-    --epochs 20 \
-    --use-knowledge \
-    --output-dir outputs/rag_experiment
+    --resume checkpoints/checkpoint_epoch_5.pt \
+    --epochs 20
 ```
 
-#### Resume Training from Checkpoint
+#### 2.3 Training Options đầy đủ
 
-```bash
-python -m src.core.vqa_pipeline \
-    --mode train \
-    --resume checkpoints/checkpoint_epoch_5.pt
-```
+| Flag | Mặc định | Mô tả |
+|------|----------|-------|
+| `--mode` | `train` | `train` / `evaluate` / `inference` |
+| `--config` | — | Đường dẫn YAML config |
+| `--images-dir` | `data/raw/images` | Thư mục ảnh |
+| `--text-file` | `data/raw/texts/...csv` | File CSV dữ liệu |
+| `--visual-backbone` | `vit` | `vit`, `resnet`, `swin`, `clip`, `dino` |
+| `--text-encoder` | `phobert` | `phobert`, `bert`, `roberta`, `bartpho` |
+| `--use-moe` | `False` | Bật Mixture of Experts |
+| `--use-knowledge` | `False` | Bật Knowledge Base / RAG |
+| `--epochs` | `20` | Số epoch |
+| `--batch-size` | `32` | Batch size |
+| `--learning-rate` | `2e-5` | Learning rate |
+| `--output-dir` | `outputs` | Thư mục output |
+| `--seed` | `42` | Random seed |
+| `--resume` | — | Đường dẫn checkpoint để resume |
 
-### Evaluation
+#### 2.4 Training Configs nâng cao
 
-```bash
-# Evaluate on test set
-python -m src.core.vqa_pipeline --mode evaluate --resume checkpoints/best_model.pt
-```
-
-### Inference
-
-```bash
-# Run inference on new images
-python -m src.core.vqa_pipeline --mode inference --resume checkpoints/best_model.pt
-```
-
----
-
-## ⚙️ Configuration
-
-### Configuration Files
-
-| File | Description |
-|------|-------------|
-| `configs/pipeline_config.yaml` | Complete pipeline configuration |
-| `configs/model_configs.yaml` | Model architecture settings |
-| `configs/training_configs.yaml` | Training hyperparameters |
-| `configs/data_configs.yaml` | Data loading settings |
-| `configs/resource_configs.yaml` | Resource monitoring thresholds |
-
-### Key Configuration Options
+Chỉnh trong `configs/training_configs.yaml`:
 
 ```yaml
-# configs/pipeline_config.yaml
+optimizer:
+  name: "adamw"
+  learning_rate: 2e-5
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
 
-# Data Configuration
-data:
-  images_dir: data/raw/images
-  batch_size: 32
-  num_workers: 4
-  augmentation_strength: medium  # light, medium, strong
+scheduler:
+  name: "cosine"
+  warmup_ratio: 0.1
+  min_lr: 1e-7
 
-# Model Configuration
-model:
-  visual_backbone: vit           # vit, resnet, clip, swin
-  text_encoder_type: phobert     # phobert, bert
-  fusion_type: cross_attention   # cross_attention, concat, bilinear
-  use_moe: false                 # Enable Mixture of Experts
-  use_knowledge: false           # Enable Knowledge Base/RAG
+loss:
+  label_smoothing: 0.1
+  focal_loss_gamma: 2.0
+  moe_aux_weight: 0.01
 
-# Training Configuration
 training:
-  num_epochs: 20
-  learning_rate: 2.0e-5
-  optimizer_name: adamw
-  scheduler_name: cosine
-  use_amp: true                  # Mixed precision training
-  early_stopping: true
+  strategy: "gradual_unfreeze"  # full | freeze_visual | freeze_text | linear_probe | gradual_unfreeze
+  mixed_precision: "fp16"       # off | fp16 | bf16
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+
+early_stopping:
+  enabled: true
   patience: 5
+  metric: "accuracy"
+  min_delta: 0.001
 ```
 
-### CLI Arguments Reference
+#### 2.5 Checkpoint format
 
-| Argument | Type | Default | Description |
-|----------|------|---------|-------------|
-| `--mode` | str | train | Pipeline mode: train, evaluate, inference |
-| `--config` | str | None | Path to YAML config file |
-| `--epochs` | int | 20 | Number of training epochs |
-| `--batch-size` | int | 32 | Training batch size |
-| `--learning-rate` | float | 2e-5 | Learning rate |
-| `--visual-backbone` | str | vit | Visual encoder: vit, resnet, clip, swin |
-| `--text-encoder` | str | phobert | Text encoder: phobert, bert |
-| `--use-moe` | flag | False | Enable Mixture of Experts |
-| `--use-knowledge` | flag | False | Enable Knowledge Base/RAG |
-| `--output-dir` | str | outputs | Output directory |
-| `--resume` | str | None | Resume from checkpoint |
+Checkpoint lưu tại `checkpoints/` gồm:
+
+```python
+{
+    "epoch": int,
+    "global_step": int,
+    "model_state_dict": ...,
+    "optimizer_state_dict": ...,
+    "scheduler_state_dict": ...,
+    "best_metric": float,
+    "metrics": dict,
+    "config": TrainingPipelineConfig,
+    "model_config": VQAModelConfig,
+    "vocabulary": dict,      # answer → id
+    "num_answers": int
+}
+```
 
 ---
 
-## 📁 Project Structure
+### 3. Đánh giá (Evaluation)
+
+#### 3.1 Chạy evaluation
+
+```bash
+# Evaluation trên validation/test set
+python -m src.core.vqa_pipeline \
+    --mode evaluate \
+    --resume checkpoints/best_model.pt
+```
+
+#### 3.2 Từ YAML config
+
+```bash
+# Trong pipeline_config.yaml, set mode: evaluate
+python -m src.core.vqa_pipeline --config configs/pipeline_config.yaml --mode evaluate
+```
+
+#### 3.3 Metrics được tính
+
+| Nhóm | Metric | Mô tả |
+|------|--------|-------|
+| **Classification** | VQA Soft Accuracy | `min(count/3, 1)` theo VQA v2 protocol |
+| | Exact Match | So khớp chuỗi chính xác |
+| | Top-K Accuracy | Top-5 accuracy |
+| **NLG** | BLEU-4 | Bilingual Evaluation Understudy |
+| | METEOR | Metric for Evaluation of Translation |
+| | ROUGE-L | Longest Common Subsequence |
+| | CIDEr | Consensus-based Image Description Evaluation |
+| **Token-level** | Precision | Word-level precision |
+| | Recall | Word-level recall |
+| | F1 Score | Harmonic mean P/R |
+| **Semantic** | WUPS | Wu-Palmer Similarity |
+
+#### 3.4 Python API
+
+```python
+from src.pipeline.evaluator.vqa_evaluator import VQAEvaluator
+
+evaluator = VQAEvaluator(model, val_loader, device=device, id2answer=id2answer)
+result = evaluator.evaluate()
+
+print(f"VQA Accuracy: {result.overall_metrics['vqa_accuracy']:.4f}")
+print(f"BLEU-4: {result.overall_metrics['bleu']:.4f}")
+```
+
+---
+
+### 4. Suy luận (Inference)
+
+#### 4.1 Chạy inference
+
+```bash
+# Inference mode
+python -m src.core.vqa_pipeline \
+    --mode inference \
+    --resume checkpoints/best_model.pt
+```
+
+#### 4.2 Python API
+
+```python
+from src.modeling.inference.vqa_predictor import VQAPredictor
+
+predictor = VQAPredictor(
+    model=model,
+    tokenizer=tokenizer,
+    id2answer=id2answer,
+    device=device
+)
+
+# Single prediction
+result = predictor.predict(image_path="path/to/image.jpg", question="Đây là gì?")
+print(f"Answer: {result.answer} (confidence: {result.confidence:.4f})")
+print(f"Top answers: {result.top_answers}")
+
+# Batch prediction
+results = predictor.predict_batch(images, questions)
+```
+
+#### 4.3 Inference config
+
+Chỉnh trong `configs/inference_configs.yaml`:
+
+```yaml
+model:
+  checkpoint_path: "checkpoints/best_model.pt"
+  device: "auto"          # auto | cuda | cpu
+  use_fp16: false
+
+inference:
+  batch_size: 32
+  top_k: 5
+  confidence_threshold: 0.0
+
+output:
+  format: "json"
+  include_probabilities: true
+  include_top_k: true
+```
+
+---
+
+### 5. Generative VQA Pipeline
+
+Pipeline cho mô hình sinh đáp án (encoder-decoder), khác với classification pipeline.
+
+#### 5.1 Chạy Generative VQA
+
+**Cách 1: YAML Config**
+
+```bash
+python -m src.core.generative_vqa_pipeline --config configs/generative_configs.yaml --mode train
+```
+
+**Cách 2: CLI Arguments**
+
+```bash
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --images-dir data/raw/images \
+    --text-file data/raw/texts/evaluate_60k_data_balanced_preprocessed.csv \
+    --visual-backbone openai/clip-vit-base-patch32 \
+    --text-encoder vinai/phobert-base \
+    --batch-size 8 \
+    --num-epochs 20 \
+    --learning-rate 5e-5 \
+    --use-moe \
+    --moe-type standard \
+    --moe-position fusion \
+    --num-experts 8 \
+    --enable-resource-management
+```
+
+#### 5.2 Generative VQA Modes
+
+| Mode | Lệnh | Mô tả |
+|------|-------|-------|
+| `train` | `--mode train` | Huấn luyện encoder-decoder |
+| `evaluate` | `--mode evaluate` | Đánh giá NLG metrics |
+| `inference` | `--mode inference` | Sinh đáp án cho ảnh + câu hỏi |
+| `demo` | `--mode demo` | Demo tương tác |
+
+#### 5.3 MOE Options cho Generative
+
+```bash
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --use-moe \
+    --moe-type vqa \
+    --moe-position both \
+    --num-experts 8 \
+    --num-vision-experts 2 \
+    --num-text-experts 2 \
+    --num-multimodal-experts 2 \
+    --num-specialized-experts 2 \
+    --expert-top-k 2
+```
+
+#### 5.4 Generation Options
+
+```bash
+python -m src.core.generative_vqa_pipeline \
+    --mode inference \
+    --max-generate-length 64 \
+    --num-beams 5 \
+    --do-sample \
+    --temperature 0.8 \
+    --top-k 50 \
+    --top-p 0.95 \
+    --checkpoint checkpoints/generative/best_generative_model.pt
+```
+
+#### 5.5 Tham số đầy đủ Generative Pipeline
+
+| Flag | Mặc định | Mô tả |
+|------|----------|-------|
+| `--mode` | `train` | `train` / `evaluate` / `inference` / `demo` |
+| `--config` | — | YAML config path |
+| `--batch-size` | `16` | Batch size (giảm nếu thiếu VRAM) |
+| `--num-epochs` | `20` | Số epoch |
+| `--learning-rate` | `5e-5` | Learning rate |
+| `--hidden-size` | `768` | Hidden dimension |
+| `--num-decoder-layers` | `6` | Số layer decoder |
+| `--num-attention-heads` | `8` | Số attention head |
+| `--use-moe` | `False` | Bật MOE |
+| `--moe-type` | `standard` | Loại MOE layer |
+| `--moe-position` | `fusion` | Vị trí MOE trong model |
+| `--use-knowledge` | `False` | Bật Knowledge Base / RAG |
+| `--max-generate-length` | `64` | Token tối đa sinh ra |
+| `--num-beams` | `1` | Beam search width (1 = greedy) |
+| `--do-sample` | `False` | Bật sampling |
+| `--temperature` | `1.0` | Sampling temperature |
+| `--enable-resource-management` | `False` | Bật giám sát tài nguyên |
+
+---
+
+### 6. Ablation Study
+
+Pipeline ablation tự động cho nghiên cứu MOE — phân tích vai trò từng loại expert, router, và cấu hình tối ưu.
+
+#### 6.1 Dry Run (xem danh sách thí nghiệm)
+
+```bash
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --dry-run
+```
+
+Output mẫu:
+
+```
+======================================================================
+  ABLATION STUDY DRY RUN: moe_ablation_study
+  Total experiments: 27
+======================================================================
+  [  1] full__noisy_topk_k2            — Baseline (all experts)
+  [  2] no_moe__noisy_topk_k2          — No MOE
+  [  3] leave_one_out_no_multimodal     — LOO: -multimodal
+  ...
+  [ 27] subset_text_vision__noisy_topk  — Subset: text+vision
+
+  Breakdown by mode:
+    full: 8 | leave_one_out: 4 | no_moe: 1 | single_expert: 4 | subset: 10
+======================================================================
+```
+
+#### 6.2 Chạy Ablation Study đầy đủ
+
+```bash
+# Từ checkpoint đã train
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --checkpoint checkpoints/best_model.pt
+
+# Với overrides
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --checkpoint checkpoints/best_model.pt \
+    --epochs 5 \
+    --batch-size 16 \
+    --output-dir outputs/ablation_quick
+
+# Resume (tự bỏ qua experiment đã chạy)
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --resume
+
+# Chạy lại từ đầu
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --no-resume
+```
+
+#### 6.3 Ablation CLI Options
+
+| Flag | Mặc định | Mô tả |
+|------|----------|-------|
+| `--config` | `configs/ablation_config.yaml` | YAML config |
+| `--checkpoint` | — | Base model checkpoint |
+| `--epochs` | (từ config) | Override số epoch per experiment |
+| `--batch-size` | (từ config) | Override batch size |
+| `--lr` | (từ config) | Override learning rate |
+| `--seed` | (từ config) | Override seed |
+| `--output-dir` | (từ config) | Override output directory |
+| `--dry-run` | `False` | Liệt kê experiments, không chạy |
+| `--resume` | `True` | Bỏ qua experiments đã hoàn thành |
+| `--no-resume` | `False` | Chạy lại tất cả từ đầu |
+| `--device` | `auto` | `cuda` / `cpu` / `cuda:0` |
+
+#### 6.4 Các loại thí nghiệm Ablation
+
+| Loại | Mô tả | Số experiments |
+|------|--------|:--------------:|
+| **Full Baseline** | Tất cả experts + default router | 1 |
+| **No-MOE** | Tắt MOE hoàn toàn | 1 |
+| **Single Expert** | Chỉ giữ 1 loại expert (vision / text / multimodal / specialized) | 4 |
+| **Leave-One-Out** | Bỏ 1 loại expert, giữ 3 còn lại | 4 |
+| **Subset** | Tổ hợp 2-3 loại expert | 10 |
+| **Router Ablation** | Thay đổi router type & top_k trên full baseline | 7+ |
+
+#### 6.5 Ablation Config YAML
+
+```yaml
+ablation:
+  name: "moe_ablation_study"
+
+  # Search space
+  search_space:
+    expert_types: [vision, text, multimodal, specialized]
+    run_single_expert: true
+    run_leave_one_out: true
+    run_subsets: true
+    max_subset_size: 3
+    min_subset_size: 2
+    include_no_moe_baseline: true
+    include_full_baseline: true
+    router_types: [topk, noisy_topk, soft, expert_choice]
+    top_k_values: [1, 2, 4]
+    load_balance_weights: [0.0, 0.01, 0.1]
+    cross_expert_router: false   # true = cross-product (nhiều experiments hơn)
+
+  # Training mỗi experiment
+  num_epochs: 10
+  learning_rate: 2e-5
+  batch_size: 32
+  early_stopping: true
+  patience: 5
+
+  # Output
+  output_dir: "outputs/ablation"
+  checkpoint_dir: "checkpoints/ablation"
+  resume: true
+```
+
+#### 6.6 Output của Ablation Study
+
+```
+outputs/ablation/
+├── moe_ablation_study_summary.json       # Tóm tắt + key findings
+├── moe_ablation_study_report.md          # Báo cáo Markdown chi tiết
+├── moe_ablation_study_table.tex          # Bảng LaTeX (cho paper)
+├── moe_ablation_study_analysis.json      # Phân tích đầy đủ
+├── moe_ablation_study_raw_results.json   # Kết quả thô
+├── ablation_results.csv                  # Bảng metrics CSV
+├── expert_contributions.csv              # Đóng góp từng expert
+├── experiment_manifest.json              # Ma trận thí nghiệm
+├── progress.json                         # Tracking tiến độ
+└── experiment_results/                   # Kết quả từng experiment
+    ├── full__noisy_topk_k2.json
+    ├── no_moe__noisy_topk_k2.json
+    ├── single_expert_vision__noisy_topk_k2.json
+    └── ...
+```
+
+**Báo cáo Markdown** bao gồm:
+- Key Findings tự động phát hiện
+- Bảng xếp hạng experiment theo VQA Accuracy
+- Phân tích đóng góp expert (essential / redundant)
+- Ma trận synergy giữa các cặp expert
+- So sánh router types
+- Bảng metrics đầy đủ
+- Delta từ baseline
+- Khuyến nghị cấu hình tối ưu
+
+#### 6.7 Ablation Python API
+
+```python
+from src.ablation import AblationRunner, AblationConfig
+
+config = AblationConfig.from_yaml("configs/ablation_config.yaml")
+
+# Xem experiment matrix
+experiments = config.generate_experiment_matrix()
+for exp in experiments:
+    print(f"{exp.experiment_id}: {exp.expert_config.description}")
+
+# Chạy study
+runner = AblationRunner(
+    model=model,
+    train_loader=train_loader,
+    val_loader=val_loader,
+    config=config,
+    device=device,
+    vocabulary=vocabulary,
+    id2answer=id2answer,
+)
+summary = runner.run()
+print(summary["key_findings"])
+```
+
+---
+
+### 7. Quản lý tài nguyên (Resource Management)
+
+#### 7.1 Bật Resource Management
+
+```bash
+# Trong Generative pipeline
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --enable-resource-management
+
+# Hoặc trong Python
+from src.resource_management import get_resource_manager
+
+rm = get_resource_manager()
+rm.start()  # Bắt đầu monitoring
+
+# ... training code ...
+
+rm.stop()
+```
+
+#### 7.2 Tính năng
+
+- **Real-time monitoring**: CPU, RAM, GPU (VRAM), Disk mỗi 5 giây
+- **Threshold alerts**: Warning (70%), Critical (90%)
+- **Emergency backup**: Tự động save checkpoint khi resource critical
+- **Auto shutdown**: Tắt training khi đạt ngưỡng critical
+- **Reports**: JSON reports tự động mỗi 30 phút
+
+#### 7.3 Cấu hình Resource
+
+Xem `configs/resource_configs.yaml`:
+
+```yaml
+thresholds:
+  cpu:
+    warning: 70
+    critical: 90
+  memory:
+    warning: 70
+    critical: 90
+  gpu:
+    warning: 70
+    critical: 90
+
+critical_action: "backup_and_shutdown"
+
+backup:
+  emergency_dir: "checkpoints/emergency_backups"
+  max_backups: 5
+  include_optimizer: true
+
+reports:
+  auto_save_interval: 1800   # 30 phút
+  output_dir: "logs/resource_reports"
+```
+
+---
+
+## ⚙ Cấu hình (Configuration)
+
+### File cấu hình
+
+| File | Mô tả |
+|------|--------|
+| `configs/pipeline_config.yaml` | **Master config** — data + model + training |
+| `configs/data_configs.yaml` | Data paths, preprocessing, normalization |
+| `configs/model_configs.yaml` | Model architecture parameters |
+| `configs/training_configs.yaml` | Optimizer, scheduler, loss, strategy |
+| `configs/inference_configs.yaml` | Inference mode, decoding, output format |
+| `configs/checkpoint_configs.yaml` | Save/load policy, best model tracking |
+| `configs/generative_configs.yaml` | Generative VQA specific configs |
+| `configs/ablation_config.yaml` | Ablation study search space |
+| `configs/resource_configs.yaml` | GPU/CPU/RAM thresholds, backup policy |
+| `configs/logging_configs.yaml` | Python logging handlers, formatters |
+| `configs/warning_configs.yaml` | Resource warning thresholds |
+
+### Thứ tự ưu tiên
+
+```
+CLI Arguments  >  YAML Config  >  Default Values
+```
+
+### Ví dụ kết hợp
+
+```bash
+# Dùng YAML config nhưng override epochs và batch-size qua CLI
+python -m src.core.vqa_pipeline \
+    --config configs/pipeline_config.yaml \
+    --epochs 10 \
+    --batch-size 16
+```
+
+---
+
+## 📁 Cấu trúc dự án
 
 ```
 AutovivqaModelBuilder/
-├── 📁 configs/                    # Configuration files
-│   ├── pipeline_config.yaml       # Main pipeline config
-│   ├── model_configs.yaml         # Model architecture
-│   ├── training_configs.yaml      # Training settings
-│   ├── data_configs.yaml          # Data loading
-│   └── resource_configs.yaml      # Resource monitoring
+├── configs/                        # Tất cả YAML configs
+│   ├── pipeline_config.yaml        # Master pipeline config
+│   ├── ablation_config.yaml        # Ablation study config
+│   ├── data_configs.yaml           # Data processing
+│   ├── model_configs.yaml          # Model architecture
+│   ├── training_configs.yaml       # Training hyperparameters
+│   ├── inference_configs.yaml      # Inference settings
+│   ├── generative_configs.yaml     # Generative VQA config
+│   ├── checkpoint_configs.yaml     # Checkpoint policy
+│   ├── resource_configs.yaml       # Resource management
+│   ├── logging_configs.yaml        # Logging setup
+│   └── warning_configs.yaml        # Warning thresholds
 │
-├── 📁 src/                        # Source code
-│   ├── 📁 core/                   # Core pipeline modules
-│   │   ├── vqa_pipeline.py        # Main orchestrator
-│   │   ├── data_pipeline.py       # Data loading pipeline
-│   │   ├── model_pipeline.py      # Model building pipeline
-│   │   ├── training_pipeline.py   # Training loop pipeline
-│   │   └── pipeline_logger.py     # Comprehensive logging
+├── src/
+│   ├── core/                       # Core pipeline orchestrators
+│   │   ├── vqa_pipeline.py         # Main VQA pipeline (classification)
+│   │   ├── generative_vqa_pipeline.py  # Generative VQA pipeline
+│   │   ├── data_pipeline.py        # 9-step data pipeline
+│   │   ├── training_pipeline.py    # Training loop + AMP + early stopping
+│   │   ├── generative_training_pipeline.py  # Generative training
+│   │   ├── model_pipeline.py       # Model construction
+│   │   └── pipeline_logger.py      # Colored pipeline logging
 │   │
-│   ├── 📁 cli/                    # Command-line interface
-│   │   ├── run_pipeline.sh        # Main CLI script
-│   │   ├── quick_start.sh         # Quick start script
-│   │   ├── run_clean.sh           # Clean output script
-│   │   └── download_data.sh       # Data download script
+│   ├── modeling/                   # Model architectures
+│   │   ├── meta_arch/              # VQA model + config
+│   │   │   ├── vqa_model.py        # VietnameseVQAModel
+│   │   │   ├── vqa_config.py       # VQAModelConfig
+│   │   │   └── generative_vqa_model.py  # GenerativeVQAModel
+│   │   ├── moe/                    # Mixture of Experts
+│   │   │   ├── moe_layer.py        # MOELayer, VQAMOELayer, SparseMOE
+│   │   │   ├── router.py           # TopK, NoisyTopK, Soft, ExpertChoice
+│   │   │   ├── expert_types.py     # Vision, Text, Multimodal, GLU experts
+│   │   │   ├── specialized_experts.py  # Segmentation, Detection, OCR, Scene
+│   │   │   └── moe_config.py       # MOE configuration
+│   │   ├── fusion/                 # Multimodal fusion strategies
+│   │   ├── knowledge_base/         # RAG, FAISS, retriever, Vietnamese NLP
+│   │   ├── inference/              # VQAPredictor, InferenceConfig
+│   │   └── tokenizer/              # Tokenizer implementations
 │   │
-│   ├── 📁 data/                   # Data handling
-│   │   ├── data_actions.py        # Data loading functions
-│   │   ├── dataset.py             # PyTorch Dataset classes
-│   │   ├── augmentation.py        # Image augmentation
-│   │   └── download_data.py       # Kaggle data download
+│   ├── ablation/                   # Ablation study pipeline
+│   │   ├── run_ablation.py         # CLI entry point
+│   │   ├── ablation_config.py      # Search space & experiment matrix
+│   │   ├── ablation_runner.py      # Orchestrator (resume, progress)
+│   │   ├── ablation_trainer.py     # Per-experiment training + MOE modifier
+│   │   ├── ablation_evaluator.py   # Cross-experiment metric aggregation
+│   │   ├── ablation_analyzer.py    # Expert importance, synergy, recommendations
+│   │   └── ablation_reporter.py    # Markdown, CSV, LaTeX report generation
 │   │
-│   ├── 📁 modeling/               # Model architecture
-│   │   ├── 📁 meta_arch/          # Main VQA model
-│   │   │   ├── vqa_model.py       # VietnameseVQAModel
-│   │   │   └── vqa_config.py      # Model configurations
-│   │   ├── 📁 backbone/           # Visual encoders
-│   │   ├── 📁 fusion/             # Multimodal fusion
-│   │   ├── 📁 moe/                # Mixture of Experts
-│   │   ├── 📁 knowledge_base/     # RAG module
-│   │   └── 📁 tokenizer/          # Text tokenizers
+│   ├── solvers/                    # Optimizers, losses, metrics
+│   │   ├── metrics/vqa_metrics.py  # VQA Accuracy, BLEU, METEOR, ROUGE, CIDEr
+│   │   ├── losses/vqa_losses.py    # CE, Focal, Label Smoothing, MOE balance
+│   │   └── optimizers/             # AdamW, LAMB, Lookahead, LR schedulers
 │   │
-│   ├── 📁 pipeline/               # Training utilities
-│   │   ├── 📁 trainer/            # Training loops
-│   │   └── 📁 evaluator/          # Evaluation metrics
+│   ├── pipeline/                   # Sub-pipeline components
+│   │   ├── trainer/                # VQATrainer (resource-aware)
+│   │   └── evaluator/              # VQAEvaluator (per-type analysis)
 │   │
-│   ├── 📁 resource_management/    # Resource monitoring
-│   │   ├── resource_monitor.py    # CPU/GPU/Memory monitor
-│   │   └── resource_manager.py    # Auto-backup on thresholds
+│   ├── data/                       # Data handling
+│   │   ├── dataset.py              # VQADataset + collate_fn
+│   │   ├── generative_dataset.py   # GenerativeVQADataset
+│   │   ├── data_actions.py         # Raw data loading
+│   │   ├── augmentation.py         # Image augmentation
+│   │   └── download_data.py        # Kaggle download
 │   │
-│   └── 📁 middleware/             # Utilities
-│       ├── config_loader.py       # Config loading
-│       ├── logger.py              # Logging setup
-│       └── monitor.py             # Memory monitoring
+│   ├── resource_management/        # GPU/CPU/RAM monitoring
+│   │   ├── resource_manager.py     # Main ResourceManager facade
+│   │   ├── resource_monitor.py     # Real-time monitoring
+│   │   ├── backup_handler.py       # Emergency checkpoint backup
+│   │   └── progress_tracker.py     # Training progress tracker
+│   │
+│   ├── cli/                        # Shell script entry points
+│   │   ├── run_pipeline.sh         # Main training script
+│   │   ├── quick_start.sh          # Quick start (download + train)
+│   │   ├── run_clean.sh            # Clean run (suppressed warnings)
+│   │   ├── run_with_config.sh      # Config-based run
+│   │   └── download_data.sh        # Data download script
+│   │
+│   ├── schema/                     # Data schemas (OneSample, etc.)
+│   ├── exception/                  # Custom exceptions
+│   ├── middleware/                  # Warning middleware
+│   └── utils/                      # Utility functions
 │
-├── 📁 data/                       # Data directory
-│   └── 📁 raw/                    # Raw data
-│       ├── 📁 images/             # Image files
-│       └── 📁 texts/              # CSV/JSON annotations
+├── data/raw/                       # Raw data (images + CSV)
+├── checkpoints/                    # Model checkpoints
+├── outputs/                        # Pipeline outputs
+├── logs/                           # Training & resource logs
+├── examples/                       # Example scripts
+├── docs/                           # Documentation
+├── notebook/                       # Jupyter notebooks
+├── tests/                          # Tests
 │
-├── 📁 docs/                       # Documentation
-│   ├── vqa_architecture.md        # Architecture details
-│   ├── fusion_approaches.md       # Fusion strategies
-│   ├── moe_approaches.md          # MOE documentation
-│   └── prepare_data.md            # Data preparation guide
-│
-├── 📁 checkpoints/                # Model checkpoints
-├── 📁 outputs/                    # Training outputs
-├── 📁 logs/                       # Log files
-│
-├── pyproject.toml                 # Project dependencies
-├── README.md                      # This file
-└── LICENSE                        # MIT License
+├── pyproject.toml                  # Project metadata & dependencies
+├── LICENSE                         # MIT License
+└── README.md                       # This file
 ```
 
 ---
 
-## 📚 Documentation
-
-### Core Documentation
-
-| Document | Description |
-|----------|-------------|
-| [VQA Architecture](docs/vqa_architecture.md) | Complete system architecture |
-| [Fusion Approaches](docs/fusion_approaches.md) | Multimodal fusion strategies |
-| [MOE Approaches](docs/moe_approaches.md) | Mixture of Experts module |
-| [Knowledge Base](docs/knowledge_base_approaches.md) | RAG integration |
-| [Data Preparation](docs/prepare_data.md) | Data setup guide |
-
-### Pipeline Output
-
-After training, the pipeline generates:
-
-```
-outputs/
-├── pipeline_summary.json       # Complete training summary
-├── training_curves.png         # Loss/accuracy plots
-└── predictions/                # Model predictions
-
-checkpoints/
-├── best_model.pt               # Best model checkpoint
-├── checkpoint_epoch_1.pt       # Epoch checkpoints
-└── checkpoint_epoch_N.pt
-
-logs/
-├── tensorboard/                # TensorBoard logs
-└── pipeline/                   # Pipeline logs
-```
-
-### Logging Output Example
-
-```
-╔══════════════════════════════════════════════════════════════════════════════════════════╗
-║                                   VQA PIPELINE                                           ║
-╚══════════════════════════════════════════════════════════════════════════════════════════╝
-
-================================================================================
-============================= VQA PIPELINE STARTED =============================
-================================================================================
-    Mode: train
-    Output directory: outputs
-    Start time: 2026-01-10 00:01:28
-
--------------------- System Information --------------------
-    Platform: Linux-6.14.0-37-generic-x86_64-with-glibc2.39
-    Python version: 3.11.14
-    PyTorch version: 2.9.1+cu128
-    CUDA available: True
-    GPU 0: NVIDIA GeForce RTX 3060 (11.6 GB)
-    Total RAM: 31.1 GB
-
-================================================================================
-============================ STAGE 1: DATA PIPELINE ============================
-================================================================================
-✓ Loaded 37077 data samples
-✓ Data split: 29661 train / 3707 val / 3709 test
-✓ Built vocabulary with 447 answer classes
-✓ DATA PIPELINE completed in 7.22s
-
-================================================================================
-=========================== STAGE 2: MODEL PIPELINE ============================
-================================================================================
-✓ Using CUDA: NVIDIA GeForce RTX 3060
-    Total parameters: 243,163,583
-    Trainable parameters: 243,163,583
-    Model size (MB): 927.60
-✓ MODEL PIPELINE completed in 6.97s
-
-================================================================================
-========================== STAGE 3: TRAINING PIPELINE ==========================
-================================================================================
-Epoch 1 [Train]: 100%|██████████| 1853/1853 [05:10<00:00, 5.97it/s, loss=1.88, acc=0.76]
-Epoch 1 [Val]: 100%|██████████| 58/58 [00:13<00:00, 4.23it/s, loss=0.35, acc=0.96]
-✓ New best accuracy: 0.9625
-✓ Checkpoint saved [BEST]: checkpoints/best_model.pt
-
-================================================================================
-=============================== PIPELINE SUMMARY ===============================
-================================================================================
-    Status: SUCCESS
-    Total execution time: 357.44s (6.0 min)
-    Best metric: 0.9625
-    Best model path: checkpoints/best_model.pt
-```
-
----
-
-## � Documentation
-
-Comprehensive documentation is available in the `docs/` directory:
-
-### Getting Started
-| Document | Description |
-|----------|-------------|
-| [Getting Started Guide](docs/getting_started.md) | Installation and first run |
-| [Pipeline Usage](docs/pipeline_usage.md) | Complete pipeline documentation |
-| [Configuration Guide](docs/configuration_guide.md) | All configuration options |
-| [API Reference](docs/api_reference.md) | Python API documentation |
-
-### Architecture & Design
-| Document | Description |
-|----------|-------------|
-| [VQA Architecture](docs/vqa_architecture.md) | System architecture overview |
-| [Fusion Approaches](docs/fusion_approaches.md) | Multimodal fusion strategies |
-| [MOE Approaches](docs/moe_approaches.md) | Mixture of Experts design |
-| [Knowledge Base](docs/knowledge_base_approaches.md) | RAG implementation |
-
-### Component Documentation
-| Document | Description |
-|----------|-------------|
-| [Image Representation](docs/image_representation_approaches.md) | Visual encoders |
-| [Text Representation](docs/text_representation_approaches.md) | Text encoders |
-| [Data Preparation](docs/prepare_data.md) | Dataset preparation |
-
----
-
-## �🔬 Development
-
-### Running Tests
+## 🔧 Tổng hợp lệnh thường dùng
 
 ```bash
-# Run all tests
-pytest tests/
+# ═══════════════════════════════════════════════
+#  DATA
+# ═══════════════════════════════════════════════
+python -m src.data.download_data                             # Tải data từ Kaggle
 
-# Run specific test
-pytest tests/test_pipeline.py -v
-```
+# ═══════════════════════════════════════════════
+#  CLASSIFICATION VQA
+# ═══════════════════════════════════════════════
+python -m src.core.vqa_pipeline --mode train                 # Train mặc định
+python -m src.core.vqa_pipeline --config configs/pipeline_config.yaml  # Train từ config
+python -m src.core.vqa_pipeline --mode train --use-moe       # Train với MOE
+python -m src.core.vqa_pipeline --mode train --use-knowledge # Train với RAG
+python -m src.core.vqa_pipeline --mode evaluate --resume checkpoints/best_model.pt  # Evaluate
+python -m src.core.vqa_pipeline --mode inference --resume checkpoints/best_model.pt # Inference
 
-### Code Quality
+# ═══════════════════════════════════════════════
+#  GENERATIVE VQA
+# ═══════════════════════════════════════════════
+python -m src.core.generative_vqa_pipeline --mode train      # Train generative
+python -m src.core.generative_vqa_pipeline --mode train --use-moe --moe-type vqa   # Với MOE
+python -m src.core.generative_vqa_pipeline --mode evaluate   # Evaluate NLG metrics
+python -m src.core.generative_vqa_pipeline --mode inference --num-beams 5  # Beam search
+python -m src.core.generative_vqa_pipeline --mode demo       # Demo tương tác
+python -m src.core.generative_vqa_pipeline --config configs/generative_configs.yaml  # Từ config
 
-```bash
-# Format code
-black src/
+# ═══════════════════════════════════════════════
+#  ABLATION STUDY
+# ═══════════════════════════════════════════════
+python -m src.ablation.run_ablation --dry-run                # Xem danh sách experiments
+python -m src.ablation.run_ablation --checkpoint checkpoints/best_model.pt  # Chạy đầy đủ
+python -m src.ablation.run_ablation --epochs 5 --batch-size 16  # Quick ablation
+python -m src.ablation.run_ablation --no-resume              # Chạy lại từ đầu
 
-# Lint code
-flake8 src/
-
-# Type checking
-mypy src/
-```
-
-### TensorBoard
-
-```bash
-# Launch TensorBoard
-tensorboard --logdir logs/tensorboard
-
-# Open in browser: http://localhost:6006
+# ═══════════════════════════════════════════════
+#  SHELL SCRIPTS
+# ═══════════════════════════════════════════════
+bash src/cli/quick_start.sh                                  # Quick start
+bash src/cli/run_pipeline.sh --mode train --epochs 20        # Shell script
+bash src/cli/run_with_config.sh                              # Từ config
+bash src/cli/run_clean.sh                                    # Clean run
 ```
 
 ---
 
-## 🤝 Contributing
+## 📚 Tài liệu chi tiết
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+| Tài liệu | Mô tả |
+|-----------|--------|
+| [docs/getting_started.md](docs/getting_started.md) | Hướng dẫn cài đặt và bắt đầu |
+| [docs/pipeline_usage.md](docs/pipeline_usage.md) | Chi tiết pipeline components |
+| [docs/configuration_guide.md](docs/configuration_guide.md) | Tất cả configuration options |
+| [docs/prepare_data.md](docs/prepare_data.md) | Chuẩn bị dữ liệu |
+| [docs/vqa_architecture.md](docs/vqa_architecture.md) | Kiến trúc hệ thống |
+| [docs/fusion_approaches.md](docs/fusion_approaches.md) | Chiến lược fusion |
+| [docs/moe_approaches.md](docs/moe_approaches.md) | Thiết kế MOE |
+| [docs/generative_vqa.md](docs/generative_vqa.md) | Generative VQA |
+| [docs/knowledge_base_approaches.md](docs/knowledge_base_approaches.md) | RAG implementation |
+| [docs/image_representation_approaches.md](docs/image_representation_approaches.md) | Visual encoders |
+| [docs/text_representation_approaches.md](docs/text_representation_approaches.md) | Text encoders |
+| [docs/api_reference.md](docs/api_reference.md) | Python API reference |
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👤 Author
-
-**Tuong Nguyen**
-- Email: richardnguyen0715@gmail.com
-- GitHub: [@tuong.nguyen](https://github.com/tuong.nguyen)
-
----
-
-## 🙏 Acknowledgments
-
-- [VinAI Research](https://vinai.io/) for PhoBERT
-- [OpenAI](https://openai.com/) for CLIP
-- [Hugging Face](https://huggingface.co/) for Transformers
-- [PyTorch](https://pytorch.org/) team
+MIT License — xem [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ---
 
 <div align="center">
 
-**⭐ Star this repo if you find it helpful!**
-
-Made with ❤️ for Vietnamese NLP
+**AutoViVQA Model Builder** — Vietnamese Visual Question Answering
 
 </div>
