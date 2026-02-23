@@ -89,6 +89,24 @@ def parse_args() -> argparse.Namespace:
         help="Do not resume — re-run all experiments from scratch",
     )
 
+    # Experiment selection
+    parser.add_argument(
+        "--experiments",
+        type=str,
+        default=None,
+        help=(
+            "Run only specific experiments by number. "
+            "Supports comma-separated values and ranges. "
+            "Example: --experiments 1,3,5-7  (runs experiments 1,3,5,6,7). "
+            "Use --dry-run first to see the full numbered list."
+        ),
+    )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Interactively select which experiments to run",
+    )
+
     # Device
     parser.add_argument(
         "--device",
@@ -128,6 +146,110 @@ def dry_run(config: AblationConfig) -> None:
     for m, count in sorted(modes.items()):
         print(f"    {m}: {count} experiments")
     print(f"\n{'='*70}")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Experiment selection utilities
+# ══════════════════════════════════════════════════════════════════════
+
+def parse_experiment_selection(selection_str: str, total: int) -> list[int]:
+    """Parse a selection string like '1,3,5-7' into a sorted list of 1-based indices.
+
+    Supports:
+        - Single numbers: '3'
+        - Comma-separated: '1,3,5'
+        - Ranges: '5-7' (inclusive)
+        - Mixed: '1,3,5-7,10'
+
+    Raises:
+        ValueError: If any index is out of range [1, total].
+    """
+    indices: set[int] = set()
+    parts = selection_str.strip().split(",")
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            lo, hi = part.split("-", 1)
+            lo, hi = int(lo.strip()), int(hi.strip())
+            if lo > hi:
+                lo, hi = hi, lo
+            indices.update(range(lo, hi + 1))
+        else:
+            indices.add(int(part))
+
+    # Validate
+    out_of_range = [i for i in indices if i < 1 or i > total]
+    if out_of_range:
+        raise ValueError(
+            f"Experiment numbers out of range [1, {total}]: {sorted(out_of_range)}"
+        )
+    return sorted(indices)
+
+
+def interactive_select(config: AblationConfig) -> list[int] | None:
+    """Show experiment list and let user interactively pick which to run.
+
+    Returns:
+        Sorted list of 1-based experiment indices, or None to run all.
+    """
+    experiments = config.generate_experiment_matrix()
+    total = len(experiments)
+
+    print(f"\n{'='*70}")
+    print(f"  EXPERIMENT LIST: {config.name}")
+    print(f"  Total experiments: {total}")
+    print(f"{'='*70}\n")
+
+    # Group by mode for readability
+    current_mode = None
+    for i, exp in enumerate(experiments, 1):
+        mode = exp.expert_config.mode
+        if mode != current_mode:
+            current_mode = mode
+            print(f"  ── {mode.upper()} {'─'*(55 - len(mode))}")
+        print(f"  [{i:3d}] {exp.experiment_id}")
+        print(f"        {exp.expert_config.description} | {exp.router_config.description}")
+    print()
+
+    print(f"{'─'*70}")
+    print("  Enter experiment numbers to run.")
+    print("  Format: 1,3,5-7  |  'all' = run all  |  'q' = quit")
+    print(f"{'─'*70}")
+
+    while True:
+        try:
+            user_input = input("\n  Your selection: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n  Cancelled.")
+            return []
+
+        if not user_input or user_input.lower() == "q":
+            print("  Cancelled.")
+            return []
+        if user_input.lower() == "all":
+            return None  # None = run all
+
+        try:
+            selected = parse_experiment_selection(user_input, total)
+            if not selected:
+                print("  No experiments selected. Try again.")
+                continue
+
+            # Confirm
+            print(f"\n  Selected {len(selected)} experiment(s):")
+            for idx in selected:
+                exp = experiments[idx - 1]
+                print(f"    [{idx:3d}] {exp.experiment_id}")
+
+            confirm = input("\n  Proceed? [Y/n]: ").strip().lower()
+            if confirm in ("", "y", "yes"):
+                return selected
+            else:
+                print("  Selection cleared. Try again.")
+        except ValueError as e:
+            print(f"  Invalid input: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -381,6 +503,21 @@ def main():
         dry_run(config)
         return
 
+    # ── Experiment selection ──
+    selected_indices = None  # None = run all
+
+    if args.interactive:
+        selected_indices = interactive_select(config)
+        if selected_indices is not None and len(selected_indices) == 0:
+            print("No experiments selected. Exiting.")
+            return
+    elif args.experiments:
+        experiments = config.generate_experiment_matrix()
+        selected_indices = parse_experiment_selection(
+            args.experiments, len(experiments)
+        )
+        print(f"\nSelected {len(selected_indices)} experiment(s): {selected_indices}")
+
     # Device
     if args.device:
         device = torch.device(args.device)
@@ -442,7 +579,7 @@ def main():
         tokenizer=tokenizer,
     )
 
-    summary = runner.run()
+    summary = runner.run(selected_indices=selected_indices)
 
     # Print key findings
     print(f"\n{'='*70}")

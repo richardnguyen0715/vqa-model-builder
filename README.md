@@ -655,7 +655,69 @@ python -m src.ablation.run_ablation \
     --no-resume
 ```
 
-#### 6.3 Ablation CLI Options
+#### 6.3 Chọn chạy experiment riêng lẻ
+
+Thay vì chạy toàn bộ, có thể chọn chạy một số experiment cụ thể:
+
+```bash
+# Bước 1: Xem danh sách experiment (có đánh số)
+python -m src.ablation.run_ablation --dry-run
+
+# Bước 2a: Chạy experiment theo số — hỗ trợ số đơn, dãy, range
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --experiments 1,3,5-7
+# → Chạy experiment #1, #3, #5, #6, #7
+
+# Bước 2b: Hoặc dùng chế độ tương tác — hiển thị danh sách, gõ số để chọn
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --interactive
+```
+
+**Cú pháp `--experiments`:**
+
+| Cú pháp | Ý nghĩa |
+|---------|--------|
+| `3` | Chạy experiment #3 |
+| `1,3,5` | Chạy experiment #1, #3, #5 |
+| `5-7` | Chạy experiment #5, #6, #7 |
+| `1,3,5-7,10` | Kết hợp: #1, #3, #5, #6, #7, #10 |
+
+**Chế độ `--interactive`:**
+
+```
+======================================================================
+  EXPERIMENT LIST: moe_ablation_study
+  Total experiments: 27
+======================================================================
+
+  ── FULL ──────────────────────────────────────────────
+  [  1] full__noisy_topk_k2
+        Baseline (all experts) | NoisyTopK k=2
+  ── NO_MOE ────────────────────────────────────────────
+  [  2] no_moe__noisy_topk_k2
+        No MOE | NoisyTopK k=2
+  ...
+
+──────────────────────────────────────────────────────────────────────
+  Enter experiment numbers to run.
+  Format: 1,3,5-7  |  'all' = run all  |  'q' = quit
+──────────────────────────────────────────────────────────────────────
+
+  Your selection: 1,3,5-7
+
+  Selected 5 experiment(s):
+    [  1] full__noisy_topk_k2
+    [  3] leave_one_out_no_multimodal__noisy_topk_k2
+    [  5] single_expert_vision__noisy_topk_k2
+    [  6] single_expert_text__noisy_topk_k2
+    [  7] single_expert_multimodal__noisy_topk_k2
+
+  Proceed? [Y/n]: y
+```
+
+#### 6.4 Ablation CLI Options
 
 | Flag | Mặc định | Mô tả |
 |------|----------|-------|
@@ -667,11 +729,13 @@ python -m src.ablation.run_ablation \
 | `--seed` | (từ config) | Override seed |
 | `--output-dir` | (từ config) | Override output directory |
 | `--dry-run` | `False` | Liệt kê experiments, không chạy |
+| `--experiments` | — | Chọn experiment theo số: `1,3,5-7` |
+| `--interactive` | `False` | Chế độ tương tác: hiển thị danh sách, gõ số để chọn |
 | `--resume` | `True` | Bỏ qua experiments đã hoàn thành |
 | `--no-resume` | `False` | Chạy lại tất cả từ đầu |
 | `--device` | `auto` | `cuda` / `cpu` / `cuda:0` |
 
-#### 6.4 Các loại thí nghiệm Ablation
+#### 6.5 Các loại thí nghiệm Ablation
 
 | Loại | Mô tả | Số experiments |
 |------|--------|:--------------:|
@@ -682,7 +746,7 @@ python -m src.ablation.run_ablation \
 | **Subset** | Tổ hợp 2-3 loại expert | 10 |
 | **Router Ablation** | Thay đổi router type & top_k trên full baseline | 7+ |
 
-#### 6.5 Ablation Config YAML
+#### 6.6 Ablation Config YAML
 
 ```yaml
 ablation:
@@ -716,7 +780,7 @@ ablation:
   resume: true
 ```
 
-#### 6.6 Output của Ablation Study
+#### 6.7 Output của Ablation Study
 
 ```
 outputs/ablation/
@@ -746,7 +810,7 @@ outputs/ablation/
 - Delta từ baseline
 - Khuyến nghị cấu hình tối ưu
 
-#### 6.7 Ablation Python API
+#### 6.8 Ablation Python API
 
 ```python
 from src.ablation import AblationRunner, AblationConfig
@@ -755,10 +819,10 @@ config = AblationConfig.from_yaml("configs/ablation_config.yaml")
 
 # Xem experiment matrix
 experiments = config.generate_experiment_matrix()
-for exp in experiments:
-    print(f"{exp.experiment_id}: {exp.expert_config.description}")
+for i, exp in enumerate(experiments, 1):
+    print(f"[{i}] {exp.experiment_id}: {exp.expert_config.description}")
 
-# Chạy study
+# Chạy toàn bộ study
 runner = AblationRunner(
     model=model,
     train_loader=train_loader,
@@ -767,9 +831,13 @@ runner = AblationRunner(
     device=device,
     vocabulary=vocabulary,
     id2answer=id2answer,
+    tokenizer=tokenizer,       # Bắt buộc cho generative model
 )
 summary = runner.run()
 print(summary["key_findings"])
+
+# Hoặc chạy một số experiment cụ thể (1-based)
+summary = runner.run(selected_indices=[1, 3, 5, 6, 7])
 ```
 
 ---
@@ -1004,6 +1072,8 @@ python -m src.core.generative_vqa_pipeline --config configs/generative_configs.y
 # ═══════════════════════════════════════════════
 python -m src.ablation.run_ablation --dry-run                # Xem danh sách experiments
 python -m src.ablation.run_ablation --checkpoint checkpoints/best_model.pt  # Chạy đầy đủ
+python -m src.ablation.run_ablation --experiments 1,3,5-7    # Chạy experiment cụ thể
+python -m src.ablation.run_ablation --interactive            # Chọn tương tác
 python -m src.ablation.run_ablation --epochs 5 --batch-size 16  # Quick ablation
 python -m src.ablation.run_ablation --no-resume              # Chạy lại từ đầu
 

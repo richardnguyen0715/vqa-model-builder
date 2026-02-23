@@ -116,8 +116,13 @@ class AblationRunner:
 
     # ── Main Entry Point ──────────────────────────────────────────
 
-    def run(self) -> Dict[str, Any]:
+    def run(self, selected_indices: Optional[List[int]] = None) -> Dict[str, Any]:
         """Execute the complete ablation study.
+
+        Args:
+            selected_indices: Optional 1-based list of experiment numbers to run.
+                If None, all experiments are run. Example: [1, 3, 5] runs only
+                the 1st, 3rd, and 5th experiments from the generated matrix.
 
         Returns:
             Dict with summary including report paths and key findings.
@@ -139,7 +144,7 @@ class AblationRunner:
                 self._load_completed_results()
 
             # 4. Run experiments
-            self._run_all_experiments()
+            self._run_all_experiments(selected_indices=selected_indices)
 
             # 5. Evaluate & Analyze
             evaluator = self._build_evaluator()
@@ -236,8 +241,22 @@ class AblationRunner:
         if loaded:
             self.logger.info(f"Resumed {loaded} completed experiments from disk")
 
-    def _run_all_experiments(self):
-        """Run all experiments in the matrix."""
+    def _run_all_experiments(self, selected_indices: Optional[List[int]] = None):
+        """Run experiments in the matrix.
+
+        Args:
+            selected_indices: Optional 1-based indices to run. If None, run all.
+        """
+        # Convert selected_indices to a set of 0-based indices for fast lookup
+        if selected_indices is not None:
+            selected_set = {i - 1 for i in selected_indices}  # 1-based → 0-based
+            self.logger.info(
+                f"Running selected experiments: "
+                f"{sorted(selected_indices)} ({len(selected_indices)}/{len(self.experiments)})"
+            )
+        else:
+            selected_set = None  # means run all
+
         trainer = AblationTrainer(
             base_model=self.model,
             train_loader=self.train_loader,
@@ -255,7 +274,11 @@ class AblationRunner:
         completed_count = len(self.completed_ids)
 
         for idx, experiment in enumerate(self.experiments, 1):
-            # Skip completed
+            # Skip if not in user selection
+            if selected_set is not None and (idx - 1) not in selected_set:
+                continue
+
+            # Skip completed (resume)
             if experiment.experiment_id in self.completed_ids:
                 self.logger.info(
                     f"[{idx}/{total}] Skipping (already completed): "
