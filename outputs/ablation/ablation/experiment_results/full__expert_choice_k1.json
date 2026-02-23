@@ -1,0 +1,49 @@
+{
+  "experiment_id": "full__expert_choice_k1",
+  "experiment_config": {
+    "experiment_id": "full__expert_choice_k1",
+    "expert_config": {
+      "mode": "full",
+      "active_experts": [
+        "vision",
+        "text",
+        "multimodal",
+        "specialized"
+      ],
+      "disabled_experts": [],
+      "num_experts_per_type": {
+        "vision": 2,
+        "text": 2,
+        "multimodal": 2,
+        "specialized": 2
+      },
+      "description": "Baseline (all experts)"
+    },
+    "router_config": {
+      "router_type": "expert_choice",
+      "top_k": 1,
+      "noise_enabled": false,
+      "load_balance_weight": 0.0,
+      "capacity_factor": 1.0,
+      "description": "Router=expert_choice | K=1 | lb=0.0"
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 8,
+    "seed": 42,
+    "tags": [
+      "router_ablation"
+    ],
+    "priority": 5
+  },
+  "metrics": {},
+  "moe_metrics": {},
+  "training_history": [],
+  "validation_history": [],
+  "total_epochs": 0,
+  "training_time": 3.2874670028686523,
+  "best_metric": 0.0,
+  "checkpoint_path": "",
+  "status": "failed",
+  "error_message": "TypeError: ExpertChoiceRouter.__init__() got an unexpected keyword argument 'top_k'\nTraceback (most recent call last):\n  File \"/workspace/vqa-model-builder/src/ablation/ablation_trainer.py\", line 435, in run_experiment\n    modifier.swap_router(experiment.router_config)\n  File \"/workspace/vqa-model-builder/src/ablation/ablation_trainer.py\", line 182, in swap_router\n    new_router = create_router(\n                 ^^^^^^^^^^^^^^\n  File \"/workspace/vqa-model-builder/src/modeling/moe/router.py\", line 480, in create_router\n    return routers[router_type](input_dim, num_experts, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nTypeError: ExpertChoiceRouter.__init__() got an unexpected keyword argument 'top_k'\n"
+}

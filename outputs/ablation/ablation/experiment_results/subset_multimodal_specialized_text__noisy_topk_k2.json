@@ -1,0 +1,210 @@
+{
+  "experiment_id": "subset_multimodal_specialized_text__noisy_topk_k2",
+  "experiment_config": {
+    "experiment_id": "subset_multimodal_specialized_text__noisy_topk_k2",
+    "expert_config": {
+      "mode": "subset",
+      "active_experts": [
+        "multimodal",
+        "specialized",
+        "text"
+      ],
+      "disabled_experts": [
+        "vision"
+      ],
+      "num_experts_per_type": {
+        "vision": 0,
+        "text": 2,
+        "multimodal": 2,
+        "specialized": 2
+      },
+      "description": "Subset: multimodal+specialized+text"
+    },
+    "router_config": {
+      "router_type": "noisy_topk",
+      "top_k": 2,
+      "noise_enabled": true,
+      "load_balance_weight": 0.01,
+      "capacity_factor": 1.25,
+      "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 8,
+    "seed": 42,
+    "tags": [
+      "subset",
+      "router_noisy_topk"
+    ],
+    "priority": 5
+  },
+  "metrics": {
+    "loss": 0.30552335822119797,
+    "accuracy": 1.0,
+    "vqa_accuracy": 0.33351317327578445,
+    "exact_match": 0.0,
+    "bleu": 0,
+    "meteor": 0.0,
+    "rouge_l": 0.0,
+    "cider": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0
+  },
+  "moe_metrics": {
+    "load_balance_loss": 0.0642985850572586,
+    "routing_entropy": 1.0336893796920776,
+    "expert_prob_mean": [
+      [
+        0.019479766488075256,
+        0.08708187192678452,
+        0.020612886175513268,
+        0.7280371189117432,
+        0.02957918867468834,
+        0.032574307173490524,
+        0.04859502241015434,
+        0.034039855003356934
+      ]
+    ],
+    "expert_usage_ratios": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "load_imbalance": 0.0,
+    "active_experts": 6,
+    "expert_mask": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "training_history": [
+    {
+      "loss": 2.764752213576106,
+      "accuracy": 0.7158416509306716,
+      "learning_rate": 2e-05
+    },
+    {
+      "loss": 1.6942236327983504,
+      "accuracy": 0.7698273536552468,
+      "learning_rate": 1.9397928714752197e-05
+    },
+    {
+      "loss": 1.5649529007653646,
+      "accuracy": 0.7688831939573779,
+      "learning_rate": 1.7664212584495545e-05
+    },
+    {
+      "loss": 1.4801243304048615,
+      "accuracy": 0.7697599136768276,
+      "learning_rate": 1.5007616877555848e-05
+    },
+    {
+      "loss": 1.4089737012922072,
+      "accuracy": 0.7713784731588886,
+      "learning_rate": 1.1748031824827196e-05
+    },
+    {
+      "loss": 1.342474457490531,
+      "accuracy": 0.7748516320474778,
+      "learning_rate": 8.277958780527115e-06
+    }
+  ],
+  "validation_history": [
+    {
+      "loss": 0.30552335822119797,
+      "accuracy": 1.0,
+      "vqa_accuracy": 0.33351317327578445,
+      "exact_match": 0.0,
+      "bleu": 0,
+      "meteor": 0.0,
+      "rouge_l": 0.0,
+      "cider": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "loss": 0.4209529040702458,
+      "accuracy": 1.0,
+      "vqa_accuracy": 0.33351317327578445,
+      "exact_match": 0.0,
+      "bleu": 0,
+      "meteor": 0.0,
+      "rouge_l": 0.0,
+      "cider": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "loss": 0.3350491428683544,
+      "accuracy": 0.9722147288912868,
+      "vqa_accuracy": 0.32748853520366866,
+      "exact_match": 0.009441596978688967,
+      "bleu": 7.989161423461458e-05,
+      "meteor": 0.013691090725033352,
+      "rouge_l": 0.018514522075352938,
+      "cider": 0.03425511960505621,
+      "precision": 0.019287833827893175,
+      "recall": 0.018271738153043792,
+      "f1": 0.018578750626228373
+    },
+    {
+      "loss": 0.41373094402510546,
+      "accuracy": 0.9239277043431346,
+      "vqa_accuracy": 0.3167880586278212,
+      "exact_match": 0.024278392230914485,
+      "bleu": 0.0001439810625310964,
+      "meteor": 0.036264216190010586,
+      "rouge_l": 0.05030637018767583,
+      "cider": 0.08700362373906892,
+      "precision": 0.05233342325330456,
+      "recall": 0.04921320025177592,
+      "f1": 0.050370598738551264
+    },
+    {
+      "loss": 0.44319681142424716,
+      "accuracy": 0.8875101159967629,
+      "vqa_accuracy": 0.30734646164913226,
+      "exact_match": 0.031292149986512,
+      "bleu": 0.00018194029942914002,
+      "meteor": 0.05022059567313039,
+      "rouge_l": 0.07193983069353989,
+      "cider": 0.1192111812876282,
+      "precision": 0.0760722956568654,
+      "recall": 0.06999820160057549,
+      "f1": 0.07214728891286754
+    },
+    {
+      "loss": 0.4508050591524305,
+      "accuracy": 0.9036957108173725,
+      "vqa_accuracy": 0.31301141983634556,
+      "exact_match": 0.03075263015915835,
+      "bleu": 0.00016992556038704132,
+      "meteor": 0.045869532201174554,
+      "rouge_l": 0.06356571223040065,
+      "cider": 0.1155860697687634,
+      "precision": 0.06649581872133802,
+      "recall": 0.06215718010970236,
+      "f1": 0.0636395750639074
+    }
+  ],
+  "total_epochs": 6,
+  "training_time": 2844.016576766968,
+  "best_metric": 0.33351317327578445,
+  "checkpoint_path": "checkpoints/ablation/subset_multimodal_specialized_text__noisy_topk_k2/best_model.pt",
+  "status": "completed",
+  "error_message": ""
+}

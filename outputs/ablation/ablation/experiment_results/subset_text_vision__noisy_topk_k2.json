@@ -1,0 +1,210 @@
+{
+  "experiment_id": "subset_text_vision__noisy_topk_k2",
+  "experiment_config": {
+    "experiment_id": "subset_text_vision__noisy_topk_k2",
+    "expert_config": {
+      "mode": "subset",
+      "active_experts": [
+        "text",
+        "vision"
+      ],
+      "disabled_experts": [
+        "multimodal",
+        "specialized"
+      ],
+      "num_experts_per_type": {
+        "vision": 2,
+        "text": 2,
+        "multimodal": 0,
+        "specialized": 0
+      },
+      "description": "Subset: text+vision"
+    },
+    "router_config": {
+      "router_type": "noisy_topk",
+      "top_k": 2,
+      "noise_enabled": true,
+      "load_balance_weight": 0.01,
+      "capacity_factor": 1.25,
+      "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 8,
+    "seed": 42,
+    "tags": [
+      "subset",
+      "router_noisy_topk"
+    ],
+    "priority": 5
+  },
+  "metrics": {
+    "loss": 0.26192503737221506,
+    "accuracy": 1.0,
+    "vqa_accuracy": 0.33351317327578445,
+    "exact_match": 0.0,
+    "bleu": 0,
+    "meteor": 0.0,
+    "rouge_l": 0.0,
+    "cider": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0
+  },
+  "moe_metrics": {
+    "load_balance_loss": 0.048760175704956055,
+    "routing_entropy": 0.16673904657363892,
+    "expert_prob_mean": [
+      [
+        0.00358263379894197,
+        0.007747695315629244,
+        0.24581964313983917,
+        0.003736841958016157,
+        0.727563738822937,
+        0.004711080342531204,
+        0.0030408648308366537,
+        0.0037975311279296875
+      ]
+    ],
+    "expert_usage_ratios": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "load_imbalance": 0.0,
+    "active_experts": 4,
+    "expert_mask": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "training_history": [
+    {
+      "loss": 2.774261035203998,
+      "accuracy": 0.7137510115996762,
+      "learning_rate": 2e-05
+    },
+    {
+      "loss": 1.6681148172679023,
+      "accuracy": 0.7688157539789587,
+      "learning_rate": 1.9397928714752197e-05
+    },
+    {
+      "loss": 1.5507323597845506,
+      "accuracy": 0.7687820339897491,
+      "learning_rate": 1.7664212584495545e-05
+    },
+    {
+      "loss": 1.46395698180892,
+      "accuracy": 0.7705691934178581,
+      "learning_rate": 1.5007616877555848e-05
+    },
+    {
+      "loss": 1.3795255356105731,
+      "accuracy": 0.7744469921769626,
+      "learning_rate": 1.1748031824827196e-05
+    },
+    {
+      "loss": 1.3257064569107375,
+      "accuracy": 0.7739749123280281,
+      "learning_rate": 8.277958780527115e-06
+    }
+  ],
+  "validation_history": [
+    {
+      "loss": 0.26192503737221506,
+      "accuracy": 1.0,
+      "vqa_accuracy": 0.33351317327578445,
+      "exact_match": 0.0,
+      "bleu": 0,
+      "meteor": 0.0,
+      "rouge_l": 0.0,
+      "cider": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "loss": 0.39485784080521813,
+      "accuracy": 0.9770704073374696,
+      "vqa_accuracy": 0.3282978149446992,
+      "exact_match": 0.007283517669274346,
+      "bleu": 7.049291674235246e-05,
+      "meteor": 0.010731342455851858,
+      "rouge_l": 0.014504091358690765,
+      "cider": 0.027806892385370662,
+      "precision": 0.015241435122740761,
+      "recall": 0.014225339447891377,
+      "f1": 0.014568319909566202
+    },
+    {
+      "loss": 0.34376698025855523,
+      "accuracy": 0.9600755327758295,
+      "vqa_accuracy": 0.3250606959805773,
+      "exact_match": 0.012948475856487725,
+      "bleu": 9.689146841076791e-05,
+      "meteor": 0.018991079126380737,
+      "rouge_l": 0.02620267961514252,
+      "cider": 0.049568304458915476,
+      "precision": 0.027380631238198005,
+      "recall": 0.02560021580793094,
+      "f1": 0.02626690816601796
+    },
+    {
+      "loss": 0.40267507873218633,
+      "accuracy": 0.9328297814944699,
+      "vqa_accuracy": 0.3192158978509126,
+      "exact_match": 0.02292959266253035,
+      "bleu": 0.0001361589841814857,
+      "meteor": 0.03328196819106905,
+      "rouge_l": 0.04530232378897067,
+      "cider": 0.08131555209425198,
+      "precision": 0.047342864850283245,
+      "recall": 0.04429907382429637,
+      "f1": 0.04537618662247742
+    },
+    {
+      "loss": 0.4365303298008853,
+      "accuracy": 0.8956029134070677,
+      "vqa_accuracy": 0.3098642208434493,
+      "exact_match": 0.030482870245481523,
+      "bleu": 0.0001741211084142221,
+      "meteor": 0.04763080037181121,
+      "rouge_l": 0.06756458180790524,
+      "cider": 0.11443403574323507,
+      "precision": 0.0712166172106825,
+      "recall": 0.06588436291700386,
+      "f1": 0.0677591943170578
+    },
+    {
+      "loss": 0.4874528893109026,
+      "accuracy": 0.8907472349608848,
+      "vqa_accuracy": 0.30833558133261396,
+      "exact_match": 0.030482870245481523,
+      "bleu": 0.00017840635136129345,
+      "meteor": 0.04878588664135206,
+      "rouge_l": 0.06977661310005523,
+      "cider": 0.1175715784882512,
+      "precision": 0.07377933639061235,
+      "recall": 0.06821329017174714,
+      "f1": 0.07009197528485363
+    }
+  ],
+  "total_epochs": 6,
+  "training_time": 2853.853001832962,
+  "best_metric": 0.33351317327578445,
+  "checkpoint_path": "checkpoints/ablation/subset_text_vision__noisy_topk_k2/best_model.pt",
+  "status": "completed",
+  "error_message": ""
+}
