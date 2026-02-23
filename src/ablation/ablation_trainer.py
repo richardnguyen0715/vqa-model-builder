@@ -30,6 +30,10 @@ from src.ablation.ablation_config import (
 )
 from src.core.pipeline_logger import PipelineLogger, get_pipeline_logger
 from src.core.training_pipeline import TrainingPipeline, TrainingPipelineConfig
+from src.core.generative_training_pipeline import (
+    GenerativeTrainingPipeline,
+    GenerativeTrainingConfig,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -101,8 +105,28 @@ def build_expert_mask(
 # MOE Modifier – inject expert mask & swap router
 # ══════════════════════════════════════════════════════════════════════
 
+def _find_moe_layer(model: nn.Module):
+    """Find MOE layer in model, supporting both top-level and nested locations.
+
+    Supported locations:
+        - model.moe_layer  (VQAModel — classification)
+        - model.fusion.moe_layer  (GenerativeVQAModel — generative)
+    """
+    # Top-level (VQAModel)
+    if hasattr(model, "moe_layer") and model.moe_layer is not None:
+        return model.moe_layer
+    # Nested in fusion (GenerativeVQAModel)
+    if hasattr(model, "fusion") and hasattr(model.fusion, "moe_layer") and model.fusion.moe_layer is not None:
+        return model.fusion.moe_layer
+    return None
+
+
 class MOEModifier:
-    """Applies ablation modifications to a VQA model's MOE layer."""
+    """Applies ablation modifications to a VQA model's MOE layer.
+
+    Supports both VQAModel (model.moe_layer) and GenerativeVQAModel
+    (model.fusion.moe_layer).
+    """
 
     def __init__(self, model: nn.Module, logger: Optional[PipelineLogger] = None):
         self.model = model
@@ -113,11 +137,11 @@ class MOEModifier:
 
     @property
     def has_moe(self) -> bool:
-        return hasattr(self.model, "moe_layer") and self.model.moe_layer is not None
+        return _find_moe_layer(self.model) is not None
 
     @property
     def moe_layer(self):
-        return self.model.moe_layer if self.has_moe else None
+        return _find_moe_layer(self.model)
 
     def apply_expert_mask(self, mask: List[bool]) -> None:
         """Apply expert mask by hooking the forward pass to zero disabled expert outputs.
@@ -333,10 +357,13 @@ class ExperimentResult:
 class AblationTrainer:
     """Trains a single ablation experiment.
 
+    Supports both classification (TrainingPipeline) and generative
+    (GenerativeTrainingPipeline) models.
+
     Workflow:
     1. Deep-copy the model
     2. Apply expert mask / router swap / MOE disable
-    3. Run TrainingPipeline
+    3. Run appropriate TrainingPipeline
     4. Collect VQA + MOE metrics
     5. Return ExperimentResult
     """
@@ -352,6 +379,7 @@ class AblationTrainer:
         model_config: Optional[Any] = None,
         vocabulary: Optional[Dict[str, int]] = None,
         id2answer: Optional[Dict[int, str]] = None,
+        tokenizer: Optional[Any] = None,
     ):
         self.base_model = base_model
         self.train_loader = train_loader
@@ -362,16 +390,21 @@ class AblationTrainer:
         self.model_config = model_config
         self.vocabulary = vocabulary
         self.id2answer = id2answer or {}
+        self.tokenizer = tokenizer  # Required for generative model
 
         # Default per-type expert counts (deduced from model if possible)
         self._default_per_type = self._detect_expert_counts()
 
+    @property
+    def is_generative(self) -> bool:
+        """Check if ablation uses generative model."""
+        return self.ablation_config.is_generative
+
     def _detect_expert_counts(self) -> Dict[str, int]:
         """Detect expert counts per type from the model's MOE layer."""
-        if not hasattr(self.base_model, "moe_layer") or self.base_model.moe_layer is None:
+        moe = _find_moe_layer(self.base_model)
+        if moe is None:
             return {"vision": 2, "text": 2, "multimodal": 2, "specialized": 2}
-
-        moe = self.base_model.moe_layer
         counts = {"vision": 0, "text": 0, "multimodal": 0, "specialized": 0}
 
         for expert in moe.experts:
@@ -386,6 +419,99 @@ class AblationTrainer:
                 counts["specialized"] += 1
 
         return counts
+
+    def _apply_ablation_modifications(
+        self, model: nn.Module, experiment: ExperimentConfig
+    ) -> MOEModifier:
+        """Apply expert mask / router swap / MOE disable to model."""
+        modifier = MOEModifier(model, self.logger)
+
+        if experiment.expert_config.mode == "no_moe":
+            modifier.disable_moe()
+        elif modifier.has_moe:
+            total_experts = len(modifier.moe_layer.experts)
+            mask = build_expert_mask(
+                experiment.expert_config,
+                total_experts,
+                self._default_per_type,
+            )
+            modifier.apply_expert_mask(mask)
+            modifier.swap_router(experiment.router_config)
+
+        return modifier
+
+    def _create_generative_pipeline(
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+    ):
+        """Create GenerativeTrainingPipeline for one experiment."""
+        cfg = self.ablation_config
+        gen_config = GenerativeTrainingConfig(
+            num_epochs=experiment.num_epochs or cfg.num_epochs,
+            learning_rate=experiment.learning_rate or cfg.learning_rate,
+            weight_decay=0.01,
+            warmup_ratio=0.1,
+            gradient_accumulation_steps=grad_accum,
+            max_grad_norm=1.0,
+            use_amp=cfg.use_amp,
+            early_stopping=cfg.early_stopping,
+            patience=cfg.patience,
+            checkpoint_dir=str(Path(cfg.checkpoint_dir) / experiment.experiment_id),
+            save_best=True,
+            save_every_epoch=False,
+            metric_for_best=cfg.primary_metric,
+            seed=experiment.seed,
+            max_generate_length=cfg.max_generate_length,
+            num_beams=cfg.num_beams,
+            do_sample=cfg.do_sample,
+            temperature=cfg.temperature,
+        )
+        return GenerativeTrainingPipeline(
+            model=model,
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            tokenizer=self.tokenizer,
+            config=gen_config,
+            logger=self.logger,
+            device=self.device,
+        )
+
+    def _create_classification_pipeline(
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+    ):
+        """Create classification TrainingPipeline for one experiment."""
+        cfg = self.ablation_config
+        tp_config = TrainingPipelineConfig(
+            num_epochs=experiment.num_epochs or cfg.num_epochs,
+            learning_rate=experiment.learning_rate or cfg.learning_rate,
+            gradient_accumulation_steps=grad_accum,
+            use_amp=cfg.use_amp,
+            early_stopping=cfg.early_stopping,
+            patience=cfg.patience,
+            seed=experiment.seed,
+            checkpoint_dir=str(Path(cfg.checkpoint_dir) / experiment.experiment_id),
+            save_best=True,
+            save_every_epoch=False,
+            metric_for_best=cfg.primary_metric,
+        )
+        return TrainingPipeline(
+            model=model,
+            train_loader=self.train_loader,
+            val_loader=self.val_loader,
+            config=tp_config,
+            logger=self.logger,
+            device=self.device,
+            model_config=self.model_config,
+            vocabulary=self.vocabulary,
+            id2answer=self.id2answer,
+        )
+
+    def _create_pipeline(
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+    ):
+        """Create the appropriate training pipeline based on model_type."""
+        if self.is_generative:
+            return self._create_generative_pipeline(model, experiment, grad_accum)
+        return self._create_classification_pipeline(model, experiment, grad_accum)
 
     def run_experiment(self, experiment: ExperimentConfig) -> ExperimentResult:
         """Run a single ablation experiment.
@@ -403,10 +529,12 @@ class AblationTrainer:
         )
 
         self.logger.start_stage(f"ABLATION: {experiment.experiment_id}")
+        self.logger.info(f"Mode: {'generative' if self.is_generative else 'classification'}")
         self.logger.info(f"Expert config: {experiment.expert_config.description}")
         self.logger.info(f"Router config: {experiment.router_config.description}")
 
         start_time = time.time()
+        grad_accum = self.ablation_config.gradient_accumulation_steps
 
         pipeline = None
         model = None
@@ -417,52 +545,10 @@ class AblationTrainer:
             model = model.to(self.device)
 
             # 2. Apply ablation modifications
-            modifier = MOEModifier(model, self.logger)
+            modifier = self._apply_ablation_modifications(model, experiment)
 
-            if experiment.expert_config.mode == "no_moe":
-                modifier.disable_moe()
-            elif modifier.has_moe:
-                # Build and apply expert mask
-                total_experts = len(modifier.moe_layer.experts)
-                mask = build_expert_mask(
-                    experiment.expert_config,
-                    total_experts,
-                    self._default_per_type,
-                )
-                modifier.apply_expert_mask(mask)
-
-                # Swap router if needed
-                modifier.swap_router(experiment.router_config)
-
-            # 3. Setup TrainingPipelineConfig
-            tp_config = TrainingPipelineConfig(
-                num_epochs=experiment.num_epochs or self.ablation_config.num_epochs,
-                learning_rate=experiment.learning_rate or self.ablation_config.learning_rate,
-                gradient_accumulation_steps=self.ablation_config.gradient_accumulation_steps,
-                use_amp=self.ablation_config.use_amp,
-                early_stopping=self.ablation_config.early_stopping,
-                patience=self.ablation_config.patience,
-                seed=experiment.seed,
-                checkpoint_dir=str(
-                    Path(self.ablation_config.checkpoint_dir) / experiment.experiment_id
-                ),
-                save_best=True,
-                save_every_epoch=False,  # Save space in ablation
-                metric_for_best="vqa_accuracy",
-            )
-
-            # 4. Run training
-            pipeline = TrainingPipeline(
-                model=model,
-                train_loader=self.train_loader,
-                val_loader=self.val_loader,
-                config=tp_config,
-                logger=self.logger,
-                device=self.device,
-                model_config=self.model_config,
-                vocabulary=self.vocabulary,
-                id2answer=self.id2answer,
-            )
+            # 3. Create and run training pipeline
+            pipeline = self._create_pipeline(model, experiment, grad_accum)
 
             try:
                 output = pipeline.run()
@@ -485,49 +571,24 @@ class AblationTrainer:
                 torch.cuda.empty_cache()
 
                 # Retry with doubled gradient accumulation (halves memory)
-                new_grad_accum = tp_config.gradient_accumulation_steps * 2
+                grad_accum *= 2
                 self.logger.warning(
                     f"OOM detected! Retrying with gradient_accumulation_steps="
-                    f"{new_grad_accum} (effective batch unchanged)"
+                    f"{grad_accum} (effective batch unchanged)"
                 )
 
-                # Recreate model
+                # Recreate model & re-apply modifications
                 model = copy.deepcopy(self.base_model)
                 model = model.to(self.device)
+                modifier = self._apply_ablation_modifications(model, experiment)
 
-                # Re-apply ablation modifications
-                modifier = MOEModifier(model, self.logger)
-                if experiment.expert_config.mode == "no_moe":
-                    modifier.disable_moe()
-                elif modifier.has_moe:
-                    total_experts = len(modifier.moe_layer.experts)
-                    mask = build_expert_mask(
-                        experiment.expert_config,
-                        total_experts,
-                        self._default_per_type,
-                    )
-                    modifier.apply_expert_mask(mask)
-                    modifier.swap_router(experiment.router_config)
-
-                tp_config.gradient_accumulation_steps = new_grad_accum
-
-                pipeline = TrainingPipeline(
-                    model=model,
-                    train_loader=self.train_loader,
-                    val_loader=self.val_loader,
-                    config=tp_config,
-                    logger=self.logger,
-                    device=self.device,
-                    model_config=self.model_config,
-                    vocabulary=self.vocabulary,
-                    id2answer=self.id2answer,
-                )
+                pipeline = self._create_pipeline(model, experiment, grad_accum)
                 output = pipeline.run()  # If this OOMs again, let it fail
 
-            # 5. Collect MOE metrics from final state
+            # 4. Collect MOE metrics from final state
             moe_metrics = modifier.collect_moe_metrics()
 
-            # 6. Build result
+            # 5. Build result
             result.metrics = output.final_metrics
             result.moe_metrics = moe_metrics
             result.training_history = output.training_history
@@ -538,9 +599,12 @@ class AblationTrainer:
             result.checkpoint_path = output.best_model_path or ""
             result.status = "completed"
 
+            # Log the primary metric
+            primary = self.ablation_config.primary_metric
+            metric_val = result.metrics.get(primary, 0)
             self.logger.success(
                 f"Experiment {experiment.experiment_id} completed: "
-                f"VQA Acc = {result.metrics.get('vqa_accuracy', 0):.4f} "
+                f"{primary} = {metric_val:.4f} "
                 f"({result.training_time:.1f}s)"
             )
 

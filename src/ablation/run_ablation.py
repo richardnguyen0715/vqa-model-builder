@@ -25,7 +25,12 @@ import gc
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Suppress known deprecation warnings before importing torch
+warnings.filterwarnings('ignore', message='.*pynvml.*')
+warnings.filterwarnings('ignore', message='.*Support for mismatched key_padding_mask.*')
 
 # Reduce CUDA memory fragmentation
 os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
@@ -101,6 +106,8 @@ def dry_run(config: AblationConfig) -> None:
 
     print(f"\n{'='*70}")
     print(f"  ABLATION STUDY DRY RUN: {config.name}")
+    print(f"  Model type: {config.model_type}")
+    print(f"  Primary metric: {config.primary_metric}")
     print(f"  Total experiments: {len(experiments)}")
     print(f"{'='*70}\n")
 
@@ -121,6 +128,230 @@ def dry_run(config: AblationConfig) -> None:
     for m, count in sorted(modes.items()):
         print(f"    {m}: {count} experiments")
     print(f"\n{'='*70}")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Generative model + data setup
+# ══════════════════════════════════════════════════════════════════════
+
+def _build_generative(config, args, pipeline_logger):
+    """Build GenerativeVQAModel and generative data loaders.
+
+    Returns:
+        (model, train_loader, val_loader, model_config, tokenizer,
+         vocabulary, id2answer)
+    """
+    import pandas as pd
+    from sklearn.model_selection import train_test_split
+    from transformers import AutoTokenizer
+
+    from src.modeling.meta_arch.generative_vqa_model import (
+        GenerativeVQAModel,
+        GenerativeVQAConfig,
+        create_generative_vqa_model,
+        get_default_generative_vqa_config,
+    )
+    from src.data.generative_dataset import (
+        GenerativeVQADataset,
+        generative_vqa_collate_fn,
+    )
+    from torch.utils.data import DataLoader
+
+    # ── Tokenizer ──
+    tokenizer = AutoTokenizer.from_pretrained(config.text_model_name)
+
+    # ── Data ──
+    pipeline_logger.info(f"Loading data from: {config.text_file}")
+    df = pd.read_csv(config.text_file)
+    pipeline_logger.info(f"Total samples: {len(df)}")
+
+    train_df, temp_df = train_test_split(
+        df,
+        test_size=1 - config.train_ratio,
+        random_state=config.seed,
+    )
+    val_ratio_adj = config.val_ratio / (config.val_ratio + config.test_ratio)
+    val_df, _ = train_test_split(
+        temp_df,
+        test_size=1 - val_ratio_adj,
+        random_state=config.seed,
+    )
+
+    pipeline_logger.info(f"Train: {len(train_df)} | Val: {len(val_df)}")
+
+    train_dataset = GenerativeVQADataset(
+        df=train_df,
+        images_dir=config.images_dir,
+        tokenizer=tokenizer,
+        max_question_length=config.max_question_length,
+        max_answer_length=config.max_answer_length,
+        mode="train",
+    )
+    val_dataset = GenerativeVQADataset(
+        df=val_df,
+        images_dir=config.images_dir,
+        tokenizer=tokenizer,
+        max_question_length=config.max_question_length,
+        max_answer_length=config.max_answer_length,
+        mode="val",
+    )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config.batch_size,
+        shuffle=True,
+        num_workers=4,
+        collate_fn=generative_vqa_collate_fn,
+        pin_memory=torch.cuda.is_available(),
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config.eval_batch_size,
+        shuffle=False,
+        num_workers=4,
+        collate_fn=generative_vqa_collate_fn,
+        pin_memory=torch.cuda.is_available(),
+    )
+
+    # ── Model ──
+    vocabulary = None
+    id2answer = None
+
+    if args.checkpoint and Path(args.checkpoint).exists():
+        print(f"Loading generative model from checkpoint: {args.checkpoint}")
+        checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        model_config = checkpoint.get("config") or checkpoint.get("model_config")
+        if isinstance(model_config, GenerativeVQAConfig):
+            model = create_generative_vqa_model(config=model_config)
+        else:
+            model = create_generative_vqa_model()
+        model.load_state_dict(checkpoint["model_state_dict"])
+        del checkpoint
+        gc.collect()
+    else:
+        model_config = get_default_generative_vqa_config(
+            visual_backbone=config.visual_model_name,
+            text_encoder=config.text_model_name,
+            vocab_size=len(tokenizer),
+            bos_token_id=tokenizer.bos_token_id or 0,
+            eos_token_id=tokenizer.eos_token_id or 2,
+            pad_token_id=tokenizer.pad_token_id or 1,
+            # Generative model settings
+            freeze_visual_encoder=config.freeze_visual_encoder,
+            freeze_question_encoder=config.freeze_question_encoder,
+            max_answer_length=config.max_answer_length,
+            # MOE
+            use_moe=config.use_moe,
+            moe_type=config.moe_type,
+            num_experts=config.num_experts,
+            num_experts_per_token=config.num_experts_per_token,
+            expert_capacity_factor=config.expert_capacity_factor,
+            moe_loss_weight=config.moe_loss_weight,
+            moe_position=config.moe_position,
+            num_vision_experts=config.num_vision_experts,
+            num_text_experts=config.num_text_experts,
+            num_multimodal_experts=config.num_multimodal_experts,
+            num_specialized_experts=config.num_specialized_experts,
+            vietnamese_optimized=config.vietnamese_optimized,
+        )
+        # Override extra fields
+        model_config.hidden_size = config.embed_dim
+        model_config.num_decoder_layers = config.num_decoder_layers
+        model_config.num_attention_heads = config.num_attention_heads
+        model_config.decoder_ff_dim = config.decoder_ff_dim
+        model_config.decoder_dropout = config.decoder_dropout
+        model_config.label_smoothing = config.label_smoothing
+        model_config.tie_word_embeddings = config.tie_word_embeddings
+        model_config.__post_init__()
+        model = create_generative_vqa_model(config=model_config)
+
+    return model, train_loader, val_loader, model_config, tokenizer, vocabulary, id2answer
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Classification model + data setup (legacy)
+# ══════════════════════════════════════════════════════════════════════
+
+def _build_classification(config, args, pipeline_logger):
+    """Build VQAModel (classification) and data loaders.
+
+    Returns:
+        (model, train_loader, val_loader, model_config, tokenizer,
+         vocabulary, id2answer)
+    """
+    from src.core.data_pipeline import DataPipeline, DataPipelineConfig
+    from src.modeling.meta_arch.vqa_model import create_vqa_model
+
+    data_config = DataPipelineConfig(
+        images_dir=config.images_dir,
+        text_file=config.text_file,
+        train_ratio=config.train_ratio,
+        val_ratio=config.val_ratio,
+        test_ratio=config.test_ratio,
+        batch_size=config.batch_size,
+        eval_batch_size=config.eval_batch_size,
+    )
+    data_pipeline = DataPipeline(config=data_config, logger=pipeline_logger)
+    data_output = data_pipeline.run()
+
+    train_loader = data_output.train_loader
+    val_loader = data_output.val_loader
+    vocabulary = data_output.answer2id
+    id2answer = data_output.id2answer
+    tokenizer = None
+
+    if args.checkpoint and Path(args.checkpoint).exists():
+        print(f"Loading classification model from checkpoint: {args.checkpoint}")
+        checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
+        model_config = checkpoint.get("model_config")
+        model = create_vqa_model(config=model_config)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        stored_vocab = checkpoint.get("vocabulary")
+        del checkpoint
+        gc.collect()
+        if stored_vocab:
+            vocabulary = stored_vocab
+            id2answer = {v: k for k, v in vocabulary.items()}
+    else:
+        from src.modeling.meta_arch.vqa_config import (
+            VQAModelConfig,
+            VisualEncoderConfig,
+            TextEncoderConfig,
+            FusionConfig,
+            MOEConfig,
+            AnswerHeadConfig,
+        )
+
+        model_config = VQAModelConfig(
+            visual_encoder=VisualEncoderConfig(
+                backbone_type=config.visual_backbone,
+                model_name=config.visual_model_name,
+                output_dim=config.embed_dim,
+            ),
+            text_encoder=TextEncoderConfig(
+                encoder_type=config.text_encoder_type,
+                model_name=config.text_model_name,
+                output_dim=config.embed_dim,
+            ),
+            fusion=FusionConfig(
+                fusion_type=config.fusion_type,
+                hidden_dim=config.embed_dim,
+                output_dim=config.embed_dim,
+            ),
+            moe=MOEConfig(
+                use_moe=True,
+                num_experts=config.num_experts,
+                top_k=config.num_experts_per_token,
+                hidden_dim=config.moe_hidden_dim,
+            ),
+            answer_head=AnswerHeadConfig(
+                num_answers=data_output.num_classes if data_output.num_classes else 3000,
+            ),
+            embed_dim=config.embed_dim,
+        )
+        model = create_vqa_model(config=model_config)
+
+    return model, train_loader, val_loader, model_config, tokenizer, vocabulary, id2answer
 
 
 def main():
@@ -158,99 +389,40 @@ def main():
 
     print(f"\nDevice: {device}")
     print(f"Config: {args.config}")
+    print(f"Model type: {config.model_type}")
+    print(f"Primary metric: {config.primary_metric}")
     print(f"Output: {config.output_dir}\n")
 
-    # ── Build model and data loaders ──
-    # Load from checkpoint if provided, otherwise build from config
-    from src.core.data_pipeline import DataPipeline, DataPipelineConfig
     from src.core.pipeline_logger import get_pipeline_logger
-    from src.modeling.meta_arch.vqa_model import create_vqa_model
-    from src.modeling.meta_arch.vqa_config import VQAModelConfig
 
     pipeline_logger = get_pipeline_logger()
 
-    # Data pipeline — build DataPipelineConfig from ablation config fields
-    data_config = DataPipelineConfig(
-        images_dir=config.images_dir,
-        text_file=config.text_file,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio,
-        batch_size=config.batch_size,
-        eval_batch_size=config.eval_batch_size,
-    )
-    data_pipeline = DataPipeline(config=data_config, logger=pipeline_logger)
-    data_output = data_pipeline.run()
-
-    train_loader = data_output.train_loader
-    val_loader = data_output.val_loader
-    vocabulary = data_output.answer2id
-    id2answer = data_output.id2answer
-
-    # Model
-    if args.checkpoint and Path(args.checkpoint).exists():
-        print(f"Loading model from checkpoint: {args.checkpoint}")
-        # Load to CPU — each experiment will copy to GPU individually
-        checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=False)
-        model_config = checkpoint.get("model_config")
-        model = create_vqa_model(config=model_config)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        stored_vocab = checkpoint.get("vocabulary")
-        # Free checkpoint tensor memory
-        del checkpoint
-        gc.collect()
-        if stored_vocab:
-            vocabulary = stored_vocab
-            id2answer = {v: k for k, v in vocabulary.items()}
+    # ── Build model and data loaders based on model_type ──
+    if config.is_generative:
+        print("Building GENERATIVE VQA model and data...")
+        model, train_loader, val_loader, model_config, tokenizer, vocabulary, id2answer = (
+            _build_generative(config, args, pipeline_logger)
+        )
     else:
-        # Build model from config
-        from src.modeling.meta_arch.vqa_config import (
-            VQAModelConfig,
-            VisualEncoderConfig,
-            TextEncoderConfig,
-            FusionConfig,
-            MOEConfig,
-            AnswerHeadConfig,
+        print("Building CLASSIFICATION VQA model and data...")
+        model, train_loader, val_loader, model_config, tokenizer, vocabulary, id2answer = (
+            _build_classification(config, args, pipeline_logger)
         )
-
-        model_config = VQAModelConfig(
-            visual_encoder=VisualEncoderConfig(
-                backbone_type=config.visual_backbone,
-                model_name=config.visual_model_name,
-                output_dim=config.embed_dim,
-            ),
-            text_encoder=TextEncoderConfig(
-                encoder_type=config.text_encoder_type,
-                model_name=config.text_model_name,
-                output_dim=config.embed_dim,
-            ),
-            fusion=FusionConfig(
-                fusion_type=config.fusion_type,
-                hidden_dim=config.embed_dim,
-                output_dim=config.embed_dim,
-            ),
-            moe=MOEConfig(
-                use_moe=True,
-                num_experts=8,
-                top_k=2,
-                hidden_dim=config.moe_hidden_dim,
-            ),
-            answer_head=AnswerHeadConfig(
-                num_answers=data_output.num_classes if data_output.num_classes else 3000,
-            ),
-            embed_dim=config.embed_dim,
-        )
-        model = create_vqa_model(config=model_config)
 
     # Keep base model on CPU — each experiment will deep-copy and move to GPU
     # This prevents OOM from having base + experiment copy both on GPU
     model = model.cpu()
 
+    # ── Log model info ──
+    from src.ablation.ablation_trainer import _find_moe_layer
+
+    moe = _find_moe_layer(model)
+
     print(f"Model: {model.__class__.__name__}")
-    print(f"  MOE layer: {'Yes' if hasattr(model, 'moe_layer') and model.moe_layer else 'No'}")
-    if hasattr(model, "moe_layer") and model.moe_layer:
-        print(f"  Experts: {len(model.moe_layer.experts)}")
-        print(f"  Router: {model.moe_layer.router.__class__.__name__}")
+    print(f"  MOE layer: {'Yes' if moe is not None else 'No'}")
+    if moe is not None:
+        print(f"  Experts: {len(moe.experts)}")
+        print(f"  Router: {moe.router.__class__.__name__}")
     print(f"  Base model kept on CPU to avoid CUDA OOM")
     print()
 
@@ -267,6 +439,7 @@ def main():
         model_config=model_config,
         vocabulary=vocabulary,
         id2answer=id2answer,
+        tokenizer=tokenizer,
     )
 
     summary = runner.run()

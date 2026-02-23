@@ -66,6 +66,7 @@ class AblationRunner:
         model_config: Optional[Any] = None,
         vocabulary: Optional[Dict[str, int]] = None,
         id2answer: Optional[Dict[int, str]] = None,
+        tokenizer: Optional[Any] = None,
     ):
         self.model = model
         self.train_loader = train_loader
@@ -78,6 +79,7 @@ class AblationRunner:
         self.model_config = model_config
         self.vocabulary = vocabulary
         self.id2answer = id2answer or {}
+        self.tokenizer = tokenizer  # Required for generative model
 
         # Paths
         self.output_dir = Path(config.output_dir)
@@ -246,6 +248,7 @@ class AblationRunner:
             model_config=self.model_config,
             vocabulary=self.vocabulary,
             id2answer=self.id2answer,
+            tokenizer=self.tokenizer,
         )
 
         total = len(self.experiments)
@@ -310,7 +313,8 @@ class AblationRunner:
 
     def _build_evaluator(self) -> AblationEvaluator:
         """Build evaluator from all collected results."""
-        evaluator = AblationEvaluator(primary_metric="vqa_accuracy")
+        primary_metric = self.config.primary_metric
+        evaluator = AblationEvaluator(primary_metric=primary_metric)
         for result in self.results:
             if result.status == "completed":
                 evaluator.add_result(result.to_dict())
@@ -318,18 +322,19 @@ class AblationRunner:
 
     def _get_best_experiment(self) -> Dict[str, Any]:
         """Find the best experiment by primary metric."""
+        primary_metric = self.config.primary_metric
         best_result = None
         best_val = -1.0
         for r in self.results:
             if r.status == "completed":
-                val = r.metrics.get("vqa_accuracy", 0.0)
+                val = r.metrics.get(primary_metric, 0.0)
                 if val > best_val:
                     best_val = val
                     best_result = r
         if best_result:
             return {
                 "experiment_id": best_result.experiment_id,
-                "vqa_accuracy": best_val,
+                primary_metric: best_val,
                 "checkpoint_path": best_result.checkpoint_path,
             }
         return {}
@@ -347,8 +352,9 @@ class AblationRunner:
 
         best = summary.get("best_experiment", {})
         if best:
+            primary = self.config.primary_metric
             self.logger.info(f"  Best experiment: {best.get('experiment_id', 'N/A')}")
-            self.logger.info(f"  Best VQA accuracy: {best.get('vqa_accuracy', 0)*100:.2f}%")
+            self.logger.info(f"  Best {primary}: {best.get(primary, 0):.4f}")
         self.logger.info("")
 
         self.logger.info("  Key Findings:")

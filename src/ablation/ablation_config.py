@@ -382,6 +382,9 @@ class AblationConfig:
     name: str = "moe_ablation_study"
     search_space: AblationSearchSpace = field(default_factory=AblationSearchSpace)
 
+    # Model type: "classification" or "generative"
+    model_type: str = "generative"
+
     # Default training settings (individual experiments can override)
     num_epochs: int = 10
     learning_rate: float = 2e-5
@@ -400,7 +403,7 @@ class AblationConfig:
     val_ratio: float = 0.1
     test_ratio: float = 0.1
 
-    # Model base settings
+    # Model base settings (shared)
     visual_backbone: str = "vit"
     visual_model_name: str = "openai/clip-vit-base-patch32"
     text_encoder_type: str = "phobert"
@@ -408,6 +411,44 @@ class AblationConfig:
     fusion_type: str = "cross_attention"
     embed_dim: int = 768
     moe_hidden_dim: int = 2048
+
+    # Generative model settings (used when model_type="generative")
+    num_decoder_layers: int = 6
+    num_attention_heads: int = 8
+    decoder_ff_dim: int = 2048
+    decoder_dropout: float = 0.1
+    max_question_length: int = 128
+    max_answer_length: int = 64
+    freeze_visual_encoder: bool = True
+    freeze_question_encoder: bool = True
+    label_smoothing: float = 0.1
+    tie_word_embeddings: bool = True
+
+    # MOE settings for generative model
+    use_moe: bool = True
+    moe_type: str = "vqa"  # 'standard', 'vqa', 'sparse'
+    moe_position: str = "fusion"  # 'fusion', 'decoder', 'both'
+    num_experts: int = 8
+    num_experts_per_token: int = 2
+    expert_capacity_factor: float = 1.25
+    moe_loss_weight: float = 0.01
+    num_vision_experts: int = 1
+    num_text_experts: int = 1
+    num_multimodal_experts: int = 1
+    num_specialized_experts: int = 1
+    vietnamese_optimized: bool = True
+
+    # Generation settings (for generative evaluation)
+    max_generate_length: int = 64
+    num_beams: int = 1
+    do_sample: bool = False
+    temperature: float = 1.0
+    gen_top_k: int = 50
+    gen_top_p: float = 0.95
+
+    # Primary metric for best model selection
+    # Use "bleu" for generative, "vqa_accuracy" for classification
+    primary_metric: str = "bleu"
 
     # Output
     output_dir: str = "outputs/ablation"
@@ -420,6 +461,11 @@ class AblationConfig:
 
     # Explicit experiments (override generated)
     explicit_experiments: List[Dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def is_generative(self) -> bool:
+        """Whether to use generative model."""
+        return self.model_type == "generative"
 
     def generate_experiment_matrix(self) -> List[ExperimentConfig]:
         """Generate the complete experiment matrix from search space.
@@ -539,6 +585,7 @@ class AblationConfig:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
+            "model_type": self.model_type,
             "search_space": self.search_space.to_dict(),
             "num_epochs": self.num_epochs,
             "learning_rate": self.learning_rate,
@@ -561,6 +608,40 @@ class AblationConfig:
             "fusion_type": self.fusion_type,
             "embed_dim": self.embed_dim,
             "moe_hidden_dim": self.moe_hidden_dim,
+            # Generative model settings
+            "num_decoder_layers": self.num_decoder_layers,
+            "num_attention_heads": self.num_attention_heads,
+            "decoder_ff_dim": self.decoder_ff_dim,
+            "decoder_dropout": self.decoder_dropout,
+            "max_question_length": self.max_question_length,
+            "max_answer_length": self.max_answer_length,
+            "freeze_visual_encoder": self.freeze_visual_encoder,
+            "freeze_question_encoder": self.freeze_question_encoder,
+            "label_smoothing": self.label_smoothing,
+            "tie_word_embeddings": self.tie_word_embeddings,
+            # MOE settings
+            "use_moe": self.use_moe,
+            "moe_type": self.moe_type,
+            "moe_position": self.moe_position,
+            "num_experts": self.num_experts,
+            "num_experts_per_token": self.num_experts_per_token,
+            "expert_capacity_factor": self.expert_capacity_factor,
+            "moe_loss_weight": self.moe_loss_weight,
+            "num_vision_experts": self.num_vision_experts,
+            "num_text_experts": self.num_text_experts,
+            "num_multimodal_experts": self.num_multimodal_experts,
+            "num_specialized_experts": self.num_specialized_experts,
+            "vietnamese_optimized": self.vietnamese_optimized,
+            # Generation settings
+            "max_generate_length": self.max_generate_length,
+            "num_beams": self.num_beams,
+            "do_sample": self.do_sample,
+            "temperature": self.temperature,
+            "gen_top_k": self.gen_top_k,
+            "gen_top_p": self.gen_top_p,
+            # Metric
+            "primary_metric": self.primary_metric,
+            # Output
             "output_dir": self.output_dir,
             "checkpoint_dir": self.checkpoint_dir,
             "log_dir": self.log_dir,
