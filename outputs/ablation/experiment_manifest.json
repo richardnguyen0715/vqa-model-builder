@@ -1,6 +1,6 @@
 {
   "study_name": "moe_ablation_study",
-  "generated_at": "2026-02-23T11:38:36.371665",
+  "generated_at": "2026-02-24T20:42:21.748187",
   "num_experiments": 27,
   "experiments": [
     {
@@ -1112,7 +1112,7 @@
     "output_dir": "outputs/ablation",
     "checkpoint_dir": "checkpoints/ablation",
     "log_dir": "logs/ablation",
-    "resume": false,
+    "resume": true,
     "max_parallel": 1,
     "explicit_experiments": []
   }

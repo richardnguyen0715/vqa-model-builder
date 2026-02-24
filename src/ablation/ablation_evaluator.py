@@ -37,12 +37,53 @@ STANDARD_METRICS = [
     "loss",
 ]
 
+# Metrics specific to generative (seq2seq) models
+GENERATIVE_METRICS = [
+    "bleu",
+    "meteor",
+    "rouge_l",
+    "cider",
+    "exact_match",
+    "precision",
+    "recall",
+    "f1",
+    "loss",
+    "perplexity",
+]
+
+# Metrics specific to classification models
+CLASSIFICATION_METRICS = [
+    "vqa_accuracy",
+    "accuracy",
+    "exact_match",
+    "precision",
+    "recall",
+    "f1",
+    "loss",
+]
+
 MOE_METRICS = [
     "load_balance_loss",
     "routing_entropy",
     "load_imbalance",
     "active_experts",
 ]
+
+
+def get_metrics_for_model_type(model_type: str = "generative") -> list:
+    """Return the appropriate metric list for the given model type.
+
+    Args:
+        model_type: 'generative' or 'classification'.
+
+    Returns:
+        List of metric name strings.
+    """
+    if model_type == "generative":
+        return GENERATIVE_METRICS
+    elif model_type == "classification":
+        return CLASSIFICATION_METRICS
+    return STANDARD_METRICS
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -144,9 +185,19 @@ class AblationEvaluator:
     - Statistical significance indicators
     """
 
-    def __init__(self, primary_metric: str = "vqa_accuracy"):
+    def __init__(
+        self,
+        primary_metric: str = "vqa_accuracy",
+        model_type: str = "generative",
+    ):
         self.primary_metric = primary_metric
+        self.model_type = model_type
         self.results: Dict[str, Dict[str, Any]] = {}  # experiment_id → result dict
+
+    @property
+    def relevant_metrics(self) -> List[str]:
+        """Return metrics appropriate for the current model_type."""
+        return get_metrics_for_model_type(self.model_type)
 
     def add_result(self, result_dict: Dict[str, Any]) -> None:
         """Add a single experiment result."""
@@ -165,11 +216,13 @@ class AblationEvaluator:
     ) -> Dict[str, Dict[str, float]]:
         """Build experiment × metric table.
 
+        Uses model-type-aware metric list when *metric_names* is ``None``.
+
         Returns:
             Dict[experiment_id, Dict[metric_name, value]]
         """
         if metric_names is None:
-            metric_names = STANDARD_METRICS
+            metric_names = self.relevant_metrics
 
         table: Dict[str, Dict[str, float]] = {}
         for exp_id, result in self.results.items():
@@ -192,7 +245,7 @@ class AblationEvaluator:
     ) -> Dict[str, MetricSummary]:
         """Compute summary statistics for each metric across all experiments."""
         if metric_names is None:
-            metric_names = STANDARD_METRICS
+            metric_names = self.relevant_metrics
 
         summaries: Dict[str, MetricSummary] = {}
         for m_name in metric_names:

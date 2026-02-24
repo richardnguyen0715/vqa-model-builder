@@ -17,7 +17,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.ablation.ablation_analyzer import AblationAnalyzer
-from src.ablation.ablation_evaluator import AblationEvaluator, STANDARD_METRICS
+from src.ablation.ablation_evaluator import (
+    AblationEvaluator,
+    STANDARD_METRICS,
+    GENERATIVE_METRICS,
+    CLASSIFICATION_METRICS,
+)
 
 
 class AblationReporter:
@@ -134,14 +139,21 @@ class AblationReporter:
         lines.append("")
         metric_table = analysis["evaluation_data"]["metric_table"]
         if metric_table:
-            # Header
-            all_metrics = STANDARD_METRICS
+            # Use model-type-aware metric list
+            all_metrics = self.evaluator.relevant_metrics
             header = "| Experiment | " + " | ".join(m.replace("_", " ").title() for m in all_metrics) + " |"
             sep = "|" + "|".join(["---"] * (len(all_metrics) + 1)) + "|"
             lines.append(header)
             lines.append(sep)
             for exp_id, metrics in metric_table.items():
-                vals = [f"{metrics.get(m, 0)*100:.2f}" for m in all_metrics]
+                vals = []
+                for m in all_metrics:
+                    v = metrics.get(m, 0)
+                    # Format perplexity without multiplying by 100
+                    if m == "perplexity":
+                        vals.append(f"{v:.2f}")
+                    else:
+                        vals.append(f"{v*100:.2f}")
                 lines.append(f"| `{exp_id}` | " + " | ".join(vals) + " |")
             lines.append("")
 
@@ -210,7 +222,7 @@ class AblationReporter:
         if not metric_table:
             return str(path)
 
-        all_metrics = STANDARD_METRICS
+        all_metrics = self.evaluator.relevant_metrics
         with open(path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["experiment_id"] + all_metrics)
@@ -254,7 +266,12 @@ class AblationReporter:
         metric_table = self.evaluator.build_metric_table()
 
         lines: List[str] = []
-        selected_metrics = ["vqa_accuracy", "bleu", "meteor", "rouge_l", "f1"]
+
+        # Select key metrics based on model type
+        if self.evaluator.model_type == "generative":
+            selected_metrics = ["bleu", "meteor", "rouge_l", "cider", "exact_match", "f1"]
+        else:
+            selected_metrics = ["vqa_accuracy", "accuracy", "exact_match", "f1"]
 
         lines.append(r"\begin{table}[h]")
         lines.append(r"\centering")

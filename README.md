@@ -47,6 +47,11 @@
   - [4. Suy luận (Inference)](#4-suy-luận-inference)
   - [5. Generative VQA Pipeline](#5-generative-vqa-pipeline)
   - [6. Ablation Study](#6-ablation-study)
+    - [6.9 Chạy lại experiment cụ thể (`--rerun`)](#69-chạy-lại-experiment-cụ-thể---rerun)
+    - [6.10 Graceful Interruption (Ctrl+C)](#610-graceful-interruption-ctrlc)
+    - [6.11 Per-experiment Log Files](#611-per-experiment-log-files)
+    - [6.12 Per-epoch Results](#612-per-epoch-results-kết-quả-từng-epoch)
+    - [6.13 Incremental Reporting & Model-type-aware Metrics](#613-incremental-reporting--model-type-aware-metrics)
   - [7. Quản lý tài nguyên (Resource Management)](#7-quản-lý-tài-nguyên-resource-management)
 - [Cấu hình (Configuration)](#-cấu-hình-configuration)
 - [Cấu trúc dự án](#-cấu-trúc-dự-án)
@@ -69,6 +74,9 @@
 | ⚡ **Training** | AMP FP16, gradient accumulation, early stopping, cosine warmup |
 | 🛡️ **Resource Management** | GPU/CPU/RAM monitoring, emergency backup, auto shutdown |
 | 🎯 **Dual Paradigm** | Classification VQA + Generative VQA (encoder-decoder) |
+| 🔄 **Graceful Interruption** | Ctrl+C → emergency checkpoint → tự động resume |
+| 📝 **Per-experiment Logging** | Log riêng biệt cho từng experiment, per-epoch CSV/JSON |
+| 📈 **Incremental Reporting** | Báo cáo tự động sau mỗi experiment hoàn thành |
 
 ---
 
@@ -653,6 +661,14 @@ python -m src.ablation.run_ablation \
 python -m src.ablation.run_ablation \
     --config configs/ablation_config.yaml \
     --no-resume
+
+# Chạy lại một số experiment cụ thể từ đầu (xóa kết quả cũ), resume các experiment khác
+python -m src.ablation.run_ablation \
+    --config configs/ablation_config.yaml \
+    --experiments 10,11,12 \
+    --rerun 10,11
+# → Experiment 10, 11: xóa kết quả cũ và chạy lại từ đầu
+# → Experiment 12: bỏ qua nếu đã hoàn thành (resume)
 ```
 
 #### 6.3 Chọn chạy experiment riêng lẻ
@@ -730,6 +746,7 @@ python -m src.ablation.run_ablation \
 | `--output-dir` | (từ config) | Override output directory |
 | `--dry-run` | `False` | Liệt kê experiments, không chạy |
 | `--experiments` | — | Chọn experiment theo số: `1,3,5-7` |
+| `--rerun` | — | Chạy lại experiment cụ thể từ đầu (xóa kết quả cũ): `10,11` |
 | `--interactive` | `False` | Chế độ tương tác: hiển thị danh sách, gõ số để chọn |
 | `--resume` | `True` | Bỏ qua experiments đã hoàn thành |
 | `--no-resume` | `False` | Chạy lại tất cả từ đầu |
@@ -793,20 +810,36 @@ outputs/ablation/
 ├── expert_contributions.csv              # Đóng góp từng expert
 ├── experiment_manifest.json              # Ma trận thí nghiệm
 ├── progress.json                         # Tracking tiến độ
-└── experiment_results/                   # Kết quả từng experiment
-    ├── full__noisy_topk_k2.json
-    ├── no_moe__noisy_topk_k2.json
-    ├── single_expert_vision__noisy_topk_k2.json
+├── experiment_results/                   # Kết quả từng experiment
+│   ├── full__noisy_topk_k2.json
+│   ├── no_moe__noisy_topk_k2.json
+│   ├── single_expert_vision__noisy_topk_k2.json
+│   └── ...
+└── epoch_results/                        # Kết quả chi tiết từng epoch
+    ├── full__noisy_topk_k2/
+    │   ├── train_history.csv             # Loss mỗi epoch
+    │   ├── val_history.csv               # Metrics validation mỗi epoch
+    │   └── epoch_summary.json            # Metadata + toàn bộ history
+    ├── no_moe__noisy_topk_k2/
+    │   ├── train_history.csv
+    │   ├── val_history.csv
+    │   └── epoch_summary.json
     └── ...
+
+logs/ablation/                            # Log riêng biệt từng experiment
+├── full__noisy_topk_k2.log
+├── no_moe__noisy_topk_k2.log
+├── single_expert_vision__noisy_topk_k2.log
+└── ...
 ```
 
 **Báo cáo Markdown** bao gồm:
 - Key Findings tự động phát hiện
-- Bảng xếp hạng experiment theo VQA Accuracy
+- Bảng xếp hạng experiment theo primary metric (BLEU cho generative, VQA Accuracy cho classification)
 - Phân tích đóng góp expert (essential / redundant)
 - Ma trận synergy giữa các cặp expert
 - So sánh router types
-- Bảng metrics đầy đủ
+- Bảng metrics đầy đủ (tự động chọn đúng metrics theo model type)
 - Delta từ baseline
 - Khuyến nghị cấu hình tối ưu
 
@@ -838,6 +871,150 @@ print(summary["key_findings"])
 
 # Hoặc chạy một số experiment cụ thể (1-based)
 summary = runner.run(selected_indices=[1, 3, 5, 6, 7])
+
+# Chạy lại experiment cụ thể từ đầu
+summary = runner.run(
+    selected_indices=[10, 11, 12],
+    rerun_indices=[10, 11],  # Chỉ rerun 10, 11; resume 12
+)
+```
+
+#### 6.9 Chạy lại experiment cụ thể (`--rerun`)
+
+Khi cần chạy lại một số experiment mà không ảnh hưởng đến kết quả của các experiment khác, sử dụng `--rerun`:
+
+```bash
+# Chạy lại experiment 10 và 11 từ đầu, resume experiment 12
+python -m src.ablation.run_ablation \
+    --experiments 10,11,12 \
+    --rerun 10,11
+
+# Chỉ rerun experiment 5 (không cần --experiments)
+python -m src.ablation.run_ablation --rerun 5
+```
+
+**Cơ chế hoạt động:**
+- `--rerun` xóa kết quả cũ của các experiment được chỉ định trước khi chạy lại
+- Các experiment không nằm trong `--rerun` sẽ được resume bình thường (bỏ qua nếu đã hoàn thành)
+- Có thể kết hợp `--experiments` và `--rerun` để kiểm soát chính xác experiment nào resume, experiment nào chạy lại
+
+#### 6.10 Graceful Interruption (Ctrl+C)
+
+Khi nhấn **Ctrl+C** trong quá trình chạy ablation study, hệ thống sẽ dừng an toàn:
+
+```
+╔══════════════════════════════════════════════════════════╗
+║  ⚠ INTERRUPTED — saving emergency checkpoint...         ║
+║  Emergency checkpoint saved: checkpoints/emergency/...   ║
+║  Completed: 15/27                                        ║
+║  Resume with: python -m src.ablation.run_ablation        ║
+║               --config configs/ablation_config.yaml      ║
+║               --resume                                   ║
+╚══════════════════════════════════════════════════════════╝
+```
+
+**Quy trình xử lý:**
+
+1. **Trong experiment**: Lưu emergency checkpoint (model state + optimizer + epoch) → kết thúc experiment hiện tại
+2. **Trong runner**: Lưu progress + partial results → sinh báo cáo trung gian → thoát sạch
+3. **Resume**: Chạy lại với `--resume` sẽ bỏ qua các experiment đã hoàn thành và tiếp tục từ experiment bị gián đoạn
+
+**Lưu ý:** Emergency checkpoint được lưu tại `checkpoints/emergency_backups/`.
+
+#### 6.11 Per-experiment Log Files
+
+Mỗi experiment tự động tạo file log riêng biệt tại `logs/ablation/`:
+
+```
+logs/ablation/
+├── full__noisy_topk_k2.log               # Log chi tiết experiment 1
+├── no_moe__noisy_topk_k2.log             # Log chi tiết experiment 2
+├── single_expert_vision__noisy_topk_k2.log
+└── ...
+```
+
+Mỗi file log chứa:
+- Thông tin cấu hình experiment (expert mask, router type)
+- Chi tiết từng epoch (train loss, validation metrics)
+- Thời gian bắt đầu/kết thúc
+- Warning và error (nếu có)
+
+Log format:
+```
+2026-02-24 10:15:32 | INFO | [full__noisy_topk_k2] Starting experiment...
+2026-02-24 10:15:32 | INFO | Expert config: all experts enabled
+2026-02-24 10:15:35 | INFO | Epoch 1/10 — train_loss: 2.3456
+2026-02-24 10:15:40 | INFO | Epoch 1/10 — val_loss: 2.1234, bleu: 0.1523, meteor: 0.2341
+...
+```
+
+#### 6.12 Per-epoch Results (Kết quả từng epoch)
+
+Sau mỗi experiment, kết quả chi tiết từng epoch được lưu tự động tại `outputs/ablation/epoch_results/<experiment_id>/`:
+
+**`train_history.csv`** — Loss training mỗi epoch:
+
+```csv
+epoch,train_loss
+1,2.3456
+2,1.8765
+3,1.5432
+...
+```
+
+**`val_history.csv`** — Validation metrics mỗi epoch:
+
+```csv
+epoch,val_loss,bleu,meteor,rouge_l,cider,exact_match,precision,recall,f1
+1,2.1234,0.1523,0.2341,0.1876,0.3456,0.0512,0.2100,0.1800,0.1900
+2,1.7654,0.2145,0.3012,0.2543,0.4567,0.0823,0.2800,0.2400,0.2600
+...
+```
+
+**`epoch_summary.json`** — Metadata + toàn bộ history:
+
+```json
+{
+  "experiment_id": "full__noisy_topk_k2",
+  "total_epochs": 10,
+  "best_epoch": 8,
+  "best_metric": 0.3245,
+  "primary_metric": "bleu",
+  "timestamp": "2026-02-24T10:30:00",
+  "train_history": [
+    {"epoch": 1, "train_loss": 2.3456},
+    {"epoch": 2, "train_loss": 1.8765}
+  ],
+  "val_history": [
+    {"epoch": 1, "val_loss": 2.1234, "bleu": 0.1523, "meteor": 0.2341},
+    {"epoch": 2, "val_loss": 1.7654, "bleu": 0.2145, "meteor": 0.3012}
+  ]
+}
+```
+
+> **Lưu ý:** Kết quả per-epoch cũng được lưu khi experiment bị gián đoạn bởi Ctrl+C (lưu các epoch đã hoàn thành).
+
+#### 6.13 Incremental Reporting & Model-type-aware Metrics
+
+**Báo cáo tăng dần:** Sau mỗi experiment hoàn thành, hệ thống tự động sinh báo cáo trung gian (Markdown + CSV) với kết quả hiện có. Điều này cho phép theo dõi tiến trình ngay trong khi ablation study đang chạy.
+
+**Metrics tự động theo model type:** Evaluator và reporter tự động chọn bộ metrics phù hợp dựa trên `model_type` trong config:
+
+| Model Type | Metrics sử dụng |
+|:----------:|:-----------------|
+| **generative** | BLEU, METEOR, ROUGE-L, CIDEr, Exact Match, Precision, Recall, F1, Loss, Perplexity |
+| **classification** | VQA Accuracy, Accuracy, Exact Match, Precision, Recall, F1, Loss |
+
+- Bảng LaTeX tự động chọn metrics phù hợp (generative: BLEU/METEOR/ROUGE-L/CIDEr; classification: VQA Accuracy/Accuracy)
+- CSV export chỉ chứa metrics liên quan đến model type
+- Markdown report xếp hạng theo `primary_metric` (mặc định: `bleu` cho generative, `vqa_accuracy` cho classification)
+
+Cấu hình trong `configs/ablation_config.yaml`:
+
+```yaml
+ablation:
+  model_type: "generative"    # "generative" hoặc "classification"
+  primary_metric: "bleu"      # Metric chính để xếp hạng
 ```
 
 ---
@@ -1076,6 +1253,8 @@ python -m src.ablation.run_ablation --experiments 1,3,5-7    # Chạy experiment
 python -m src.ablation.run_ablation --interactive            # Chọn tương tác
 python -m src.ablation.run_ablation --epochs 5 --batch-size 16  # Quick ablation
 python -m src.ablation.run_ablation --no-resume              # Chạy lại từ đầu
+python -m src.ablation.run_ablation --rerun 10,11            # Chạy lại experiment 10, 11 từ đầu
+python -m src.ablation.run_ablation --experiments 10-12 --rerun 10  # Mixed resume/rerun
 
 # ═══════════════════════════════════════════════
 #  SHELL SCRIPTS

@@ -11,10 +11,14 @@ Handles:
 """
 
 import copy
+import csv
 import gc
+import json
+import logging
 import time
 import traceback
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -395,6 +399,12 @@ class AblationTrainer:
         # Default per-type expert counts (deduced from model if possible)
         self._default_per_type = self._detect_expert_counts()
 
+        # Track partial result from interrupted experiments (Ctrl+C)
+        self._last_interrupted_result = None
+
+        # Per-experiment file handler (attached/detached per run)
+        self._experiment_file_handler: Optional[logging.FileHandler] = None
+
     @property
     def is_generative(self) -> bool:
         """Check if ablation uses generative model."""
@@ -513,6 +523,106 @@ class AblationTrainer:
             return self._create_generative_pipeline(model, experiment, grad_accum)
         return self._create_classification_pipeline(model, experiment, grad_accum)
 
+    # ── Per-experiment logging ────────────────────────────────────
+
+    def _attach_experiment_log(self, experiment: ExperimentConfig) -> None:
+        """Attach a dedicated file handler for this experiment's log.
+
+        All messages emitted through ``self.logger`` will also be written to
+        ``<log_dir>/<experiment_id>.log`` until ``_detach_experiment_log()``
+        is called.
+        """
+        log_dir = Path(self.ablation_config.log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_id = experiment.experiment_id.replace("/", "_").replace("\\", "_")
+        log_path = log_dir / f"{safe_id}.log"
+
+        handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+        handler.setLevel(logging.DEBUG)
+        fmt = logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(fmt)
+
+        # Attach to the underlying standard logger
+        self.logger.logger.addHandler(handler)
+        self._experiment_file_handler = handler
+        self.logger.info(f"Experiment log: {log_path}")
+
+    def _detach_experiment_log(self) -> None:
+        """Remove the per-experiment file handler."""
+        if self._experiment_file_handler is not None:
+            self.logger.logger.removeHandler(self._experiment_file_handler)
+            self._experiment_file_handler.close()
+            self._experiment_file_handler = None
+
+    # ── Per-epoch result persistence ──────────────────────────────
+
+    def _save_epoch_results(
+        self, experiment: ExperimentConfig, result: "ExperimentResult"
+    ) -> Optional[str]:
+        """Save per-epoch training and validation metrics for one experiment.
+
+        Creates:
+          <output_dir>/epoch_results/<experiment_id>/train_history.csv
+          <output_dir>/epoch_results/<experiment_id>/val_history.csv
+          <output_dir>/epoch_results/<experiment_id>/epoch_summary.json
+
+        Returns:
+            Path to the epoch results directory, or None if nothing to save.
+        """
+        if not result.training_history and not result.validation_history:
+            return None
+
+        out_dir = (
+            Path(self.ablation_config.output_dir)
+            / "epoch_results"
+            / experiment.experiment_id.replace("/", "_").replace("\\", "_")
+        )
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # ── Training history CSV ──
+        if result.training_history:
+            train_csv = out_dir / "train_history.csv"
+            train_keys = sorted(result.training_history[0].keys())
+            with open(train_csv, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["epoch"] + train_keys)
+                writer.writeheader()
+                for epoch_idx, row in enumerate(result.training_history, 1):
+                    writer.writerow({"epoch": epoch_idx, **row})
+
+        # ── Validation history CSV ──
+        if result.validation_history:
+            val_csv = out_dir / "val_history.csv"
+            val_keys = sorted(result.validation_history[0].keys())
+            with open(val_csv, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=["epoch"] + val_keys)
+                writer.writeheader()
+                for epoch_idx, row in enumerate(result.validation_history, 1):
+                    writer.writerow({"epoch": epoch_idx, **row})
+
+        # ── Epoch summary JSON (combined) ──
+        epoch_summary = {
+            "experiment_id": experiment.experiment_id,
+            "model_type": "generative" if self.is_generative else "classification",
+            "total_epochs": result.total_epochs,
+            "best_metric": result.best_metric,
+            "primary_metric": self.ablation_config.primary_metric,
+            "status": result.status,
+            "training_time": result.training_time,
+            "training_history": result.training_history,
+            "validation_history": result.validation_history,
+            "saved_at": datetime.now().isoformat(),
+        }
+        summary_path = out_dir / "epoch_summary.json"
+        with open(summary_path, "w") as f:
+            json.dump(epoch_summary, f, indent=2, default=str)
+
+        self.logger.info(f"Epoch results saved: {out_dir}")
+        return str(out_dir)
+
     def run_experiment(self, experiment: ExperimentConfig) -> ExperimentResult:
         """Run a single ablation experiment.
 
@@ -527,6 +637,9 @@ class AblationTrainer:
             experiment_config=experiment.to_dict(),
             status="running",
         )
+
+        # ── Per-experiment log file ──
+        self._attach_experiment_log(experiment)
 
         self.logger.start_stage(f"ABLATION: {experiment.experiment_id}")
         self.logger.info(f"Mode: {'generative' if self.is_generative else 'classification'}")
@@ -608,6 +721,54 @@ class AblationTrainer:
                 f"({result.training_time:.1f}s)"
             )
 
+            # 6. Save per-epoch results to disk
+            try:
+                self._save_epoch_results(experiment, result)
+            except Exception as e:
+                self.logger.warning(f"Failed to save epoch results: {e}")
+
+        except KeyboardInterrupt:
+            # ── Ctrl+C during training: save emergency checkpoint ──
+            result.status = "interrupted"
+            result.training_time = time.time() - start_time
+            result.error_message = "Interrupted by user (Ctrl+C)"
+
+            # Gather partial history from pipeline if available
+            if pipeline is not None:
+                result.training_history = getattr(pipeline, "training_history", [])
+                result.validation_history = getattr(pipeline, "validation_history", [])
+                result.total_epochs = getattr(pipeline, "current_epoch", 0)
+                result.best_metric = getattr(pipeline, "best_metric", 0.0)
+                result.best_model_path = getattr(pipeline, "best_model_path", None) or ""
+
+            # Save emergency checkpoint with current model state
+            ckpt_path = self._save_emergency_checkpoint(
+                model=model,
+                pipeline=pipeline,
+                experiment=experiment,
+            )
+            if ckpt_path:
+                result.checkpoint_path = ckpt_path
+
+            self.logger.warning(
+                f"Experiment {experiment.experiment_id} INTERRUPTED at "
+                f"epoch {result.total_epochs} ({result.training_time:.1f}s)"
+            )
+            if ckpt_path:
+                self.logger.info(f"  Emergency checkpoint saved: {ckpt_path}")
+
+            # Save partial epoch results before exiting
+            try:
+                self._save_epoch_results(experiment, result)
+            except Exception:
+                pass
+
+            # Store partial result so the runner can retrieve it
+            self._last_interrupted_result = result
+
+            # Re-raise so the runner can handle the pipeline-level shutdown
+            raise
+
         except Exception as e:
             result.status = "failed"
             result.error_message = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
@@ -648,4 +809,91 @@ class AblationTrainer:
                 success=(result.status == "completed"),
             )
 
+            # Detach per-experiment log file handler
+            self._detach_experiment_log()
+
         return result
+
+    def _save_emergency_checkpoint(
+        self,
+        model: Optional[nn.Module],
+        pipeline: Optional[Any],
+        experiment: ExperimentConfig,
+    ) -> Optional[str]:
+        """Save an emergency checkpoint when training is interrupted.
+
+        Captures the current model state, optimizer state, epoch, and metrics
+        so the experiment can potentially be analyzed or resumed later.
+
+        Args:
+            model: The model being trained (may be on GPU).
+            pipeline: The training pipeline (holds optimizer, scheduler, etc.).
+            experiment: Current experiment configuration.
+
+        Returns:
+            Path to saved checkpoint, or None if saving failed.
+        """
+        try:
+            ckpt_dir = Path(self.ablation_config.checkpoint_dir) / "emergency_backups"
+            ckpt_dir.mkdir(parents=True, exist_ok=True)
+
+            safe_id = experiment.experiment_id.replace("/", "_").replace("\\", "_")
+            ckpt_path = ckpt_dir / f"{safe_id}_interrupted.pt"
+
+            checkpoint_data: Dict[str, Any] = {
+                "experiment_id": experiment.experiment_id,
+                "experiment_config": experiment.to_dict(),
+                "status": "interrupted",
+            }
+
+            # Model state
+            if model is not None:
+                try:
+                    checkpoint_data["model_state_dict"] = model.state_dict()
+                except Exception:
+                    pass
+
+            # Pipeline state (optimizer, scheduler, epoch)
+            if pipeline is not None:
+                checkpoint_data["epoch"] = getattr(pipeline, "current_epoch", 0)
+                checkpoint_data["global_step"] = getattr(pipeline, "global_step", 0)
+                checkpoint_data["best_metric"] = getattr(pipeline, "best_metric", 0.0)
+
+                if hasattr(pipeline, "optimizer") and pipeline.optimizer is not None:
+                    try:
+                        checkpoint_data["optimizer_state_dict"] = (
+                            pipeline.optimizer.state_dict()
+                        )
+                    except Exception:
+                        pass
+
+                if hasattr(pipeline, "scheduler") and pipeline.scheduler is not None:
+                    try:
+                        checkpoint_data["scheduler_state_dict"] = (
+                            pipeline.scheduler.state_dict()
+                        )
+                    except Exception:
+                        pass
+
+                if hasattr(pipeline, "scaler") and pipeline.scaler is not None:
+                    try:
+                        checkpoint_data["scaler_state_dict"] = (
+                            pipeline.scaler.state_dict()
+                        )
+                    except Exception:
+                        pass
+
+                # Training history so far
+                checkpoint_data["training_history"] = getattr(
+                    pipeline, "training_history", []
+                )
+                checkpoint_data["validation_history"] = getattr(
+                    pipeline, "validation_history", []
+                )
+
+            torch.save(checkpoint_data, ckpt_path)
+            return str(ckpt_path)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to save emergency checkpoint: {e}")
+            return None

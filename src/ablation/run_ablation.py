@@ -95,10 +95,22 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help=(
-            "Run only specific experiments by number. "
+            "Run only specific experiments by number (resume by default). "
             "Supports comma-separated values and ranges. "
             "Example: --experiments 1,3,5-7  (runs experiments 1,3,5,6,7). "
             "Use --dry-run first to see the full numbered list."
+        ),
+    )
+    parser.add_argument(
+        "--rerun",
+        type=str,
+        default=None,
+        help=(
+            "Force re-run specific experiments from scratch (delete old results). "
+            "Supports same format as --experiments. "
+            "Can be combined with --experiments for mixed resume/rerun. "
+            "Example: --experiments 10,11 --rerun 10  "
+            "(resume 11 if completed, re-run 10 from scratch)."
         ),
     )
     parser.add_argument(
@@ -505,6 +517,7 @@ def main():
 
     # ── Experiment selection ──
     selected_indices = None  # None = run all
+    rerun_indices = None     # None = no forced reruns
 
     if args.interactive:
         selected_indices = interactive_select(config)
@@ -517,6 +530,21 @@ def main():
             args.experiments, len(experiments)
         )
         print(f"\nSelected {len(selected_indices)} experiment(s): {selected_indices}")
+
+    # Parse --rerun (force re-run from scratch)
+    if args.rerun:
+        experiments = config.generate_experiment_matrix()
+        rerun_indices = parse_experiment_selection(
+            args.rerun, len(experiments)
+        )
+        print(f"Force re-run {len(rerun_indices)} experiment(s): {rerun_indices}")
+        # Auto-include rerun experiments in selected set
+        if selected_indices is not None:
+            merged = sorted(set(selected_indices) | set(rerun_indices))
+            selected_indices = merged
+        # If no --experiments but --rerun specified, only run those
+        elif not args.interactive:
+            selected_indices = rerun_indices
 
     # Device
     if args.device:
@@ -579,14 +607,28 @@ def main():
         tokenizer=tokenizer,
     )
 
-    summary = runner.run(selected_indices=selected_indices)
+    summary = runner.run(
+        selected_indices=selected_indices,
+        rerun_indices=rerun_indices,
+    )
 
     # Print key findings
-    print(f"\n{'='*70}")
-    print("  KEY FINDINGS:")
-    for i, finding in enumerate(summary.get("key_findings", []), 1):
-        print(f"  {i}. {finding}")
-    print(f"{'='*70}\n")
+    if summary.get("interrupted"):
+        print(f"\n{'='*70}")
+        print("  STUDY INTERRUPTED — partial results saved.")
+        interrupted_at = summary.get("interrupted_at", "unknown")
+        completed = summary.get("completed", summary.get("total_completed", "?"))
+        total_exp = summary.get("total_experiments", "?")
+        print(f"  Interrupted at: {interrupted_at}")
+        print(f"  Completed: {completed}/{total_exp}")
+        print(f"  Resume with: python -m src.ablation.run_ablation --config {args.config} --resume")
+        print(f"{'='*70}\n")
+    else:
+        print(f"\n{'='*70}")
+        print("  KEY FINDINGS:")
+        for i, finding in enumerate(summary.get("key_findings", []), 1):
+            print(f"  {i}. {finding}")
+        print(f"{'='*70}\n")
 
 
 if __name__ == "__main__":
