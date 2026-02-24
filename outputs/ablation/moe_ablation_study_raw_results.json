@@ -1,0 +1,135 @@
+{
+  "primary_metric": "bleu",
+  "num_experiments": 0,
+  "ranking": [],
+  "deltas": {},
+  "expert_importance": [
+    {
+      "expert_type": "vision",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "text",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "multimodal",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "specialized",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    }
+  ],
+  "metric_summaries": {
+    "bleu": {
+      "name": "bleu",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "meteor": {
+      "name": "meteor",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "rouge_l": {
+      "name": "rouge_l",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "cider": {
+      "name": "cider",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "exact_match": {
+      "name": "exact_match",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "precision": {
+      "name": "precision",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "recall": {
+      "name": "recall",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "f1": {
+      "name": "f1",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "loss": {
+      "name": "loss",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    },
+    "perplexity": {
+      "name": "perplexity",
+      "mean": 0.0,
+      "std": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "best_experiment": "",
+      "values": {}
+    }
+  },
+  "metric_table": {},
+  "moe_metric_table": {},
+  "router_comparison": {}
+}

@@ -333,6 +333,7 @@ class ExperimentResult:
     checkpoint_path: str = ""
     status: str = "pending"  # pending, running, completed, failed, skipped
     error_message: str = ""
+    device_used: str = ""  # Device actually used (e.g. "cuda", "cpu" if OOM fallback)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -351,6 +352,7 @@ class ExperimentResult:
             "checkpoint_path": self.checkpoint_path,
             "status": self.status,
             "error_message": self.error_message,
+            "device_used": self.device_used,
         }
 
 
@@ -451,10 +453,16 @@ class AblationTrainer:
         return modifier
 
     def _create_generative_pipeline(
-        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int,
+        device_override: Optional[torch.device] = None,
     ):
         """Create GenerativeTrainingPipeline for one experiment."""
+        device = device_override or self.device
         cfg = self.ablation_config
+
+        # Disable AMP when running on CPU (AMP is CUDA-only)
+        use_amp = cfg.use_amp and (device.type != "cpu")
+
         gen_config = GenerativeTrainingConfig(
             num_epochs=experiment.num_epochs or cfg.num_epochs,
             learning_rate=experiment.learning_rate or cfg.learning_rate,
@@ -462,7 +470,7 @@ class AblationTrainer:
             warmup_ratio=0.1,
             gradient_accumulation_steps=grad_accum,
             max_grad_norm=1.0,
-            use_amp=cfg.use_amp,
+            use_amp=use_amp,
             early_stopping=cfg.early_stopping,
             patience=cfg.patience,
             checkpoint_dir=str(Path(cfg.checkpoint_dir) / experiment.experiment_id),
@@ -482,19 +490,25 @@ class AblationTrainer:
             tokenizer=self.tokenizer,
             config=gen_config,
             logger=self.logger,
-            device=self.device,
+            device=device,
         )
 
     def _create_classification_pipeline(
-        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int,
+        device_override: Optional[torch.device] = None,
     ):
         """Create classification TrainingPipeline for one experiment."""
+        device = device_override or self.device
         cfg = self.ablation_config
+
+        # Disable AMP when running on CPU (AMP is CUDA-only)
+        use_amp = cfg.use_amp and (device.type != "cpu")
+
         tp_config = TrainingPipelineConfig(
             num_epochs=experiment.num_epochs or cfg.num_epochs,
             learning_rate=experiment.learning_rate or cfg.learning_rate,
             gradient_accumulation_steps=grad_accum,
-            use_amp=cfg.use_amp,
+            use_amp=use_amp,
             early_stopping=cfg.early_stopping,
             patience=cfg.patience,
             seed=experiment.seed,
@@ -509,19 +523,24 @@ class AblationTrainer:
             val_loader=self.val_loader,
             config=tp_config,
             logger=self.logger,
-            device=self.device,
+            device=device,
             model_config=self.model_config,
             vocabulary=self.vocabulary,
             id2answer=self.id2answer,
         )
 
     def _create_pipeline(
-        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int
+        self, model: nn.Module, experiment: ExperimentConfig, grad_accum: int,
+        device_override: Optional[torch.device] = None,
     ):
         """Create the appropriate training pipeline based on model_type."""
         if self.is_generative:
-            return self._create_generative_pipeline(model, experiment, grad_accum)
-        return self._create_classification_pipeline(model, experiment, grad_accum)
+            return self._create_generative_pipeline(
+                model, experiment, grad_accum, device_override=device_override,
+            )
+        return self._create_classification_pipeline(
+            model, experiment, grad_accum, device_override=device_override,
+        )
 
     # ── Per-experiment logging ────────────────────────────────────
 
@@ -655,13 +674,17 @@ class AblationTrainer:
         try:
             # 1. Deep-copy model (base_model should be on CPU to avoid double GPU usage)
             model = copy.deepcopy(self.base_model)
-            model = model.to(self.device)
+            # Use a local run_device so CPU fallback only applies to THIS experiment
+            run_device = self.device
+            model = model.to(run_device)
 
             # 2. Apply ablation modifications
             modifier = self._apply_ablation_modifications(model, experiment)
 
             # 3. Create and run training pipeline
-            pipeline = self._create_pipeline(model, experiment, grad_accum)
+            # Use a local device variable so CPU fallback only affects THIS experiment
+            run_device = self.device
+            pipeline = self._create_pipeline(model, experiment, grad_accum, device_override=run_device)
 
             try:
                 output = pipeline.run()
@@ -692,11 +715,45 @@ class AblationTrainer:
 
                 # Recreate model & re-apply modifications
                 model = copy.deepcopy(self.base_model)
-                model = model.to(self.device)
+                model = model.to(run_device)
                 modifier = self._apply_ablation_modifications(model, experiment)
 
-                pipeline = self._create_pipeline(model, experiment, grad_accum)
-                output = pipeline.run()  # If this OOMs again, let it fail
+                pipeline = self._create_pipeline(model, experiment, grad_accum, device_override=run_device)
+
+                try:
+                    output = pipeline.run()
+                except (torch.cuda.OutOfMemoryError, RuntimeError) as oom_err2:
+                    # Second OOM — fall back to CPU for this experiment only
+                    if "out of memory" not in str(oom_err2).lower():
+                        raise
+
+                    del pipeline
+                    pipeline = None
+                    if model is not None:
+                        try:
+                            model.cpu()
+                        except Exception:
+                            pass
+                        del model
+                        model = None
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+                    run_device = torch.device("cpu")
+                    self.logger.warning(
+                        f"OOM persists after doubling grad_accum! "
+                        f"Falling back to CPU for experiment "
+                        f"'{experiment.experiment_id}'. "
+                        f"(Next experiment will retry GPU)"
+                    )
+
+                    model = copy.deepcopy(self.base_model)
+                    model = model.to(run_device)
+                    modifier = self._apply_ablation_modifications(model, experiment)
+                    pipeline = self._create_pipeline(
+                        model, experiment, grad_accum, device_override=run_device
+                    )
+                    output = pipeline.run()  # If this also fails, let it propagate
 
             # 4. Collect MOE metrics from final state
             moe_metrics = modifier.collect_moe_metrics()
@@ -711,14 +768,16 @@ class AblationTrainer:
             result.best_metric = output.best_metric
             result.checkpoint_path = output.best_model_path or ""
             result.status = "completed"
+            result.device_used = str(run_device)
 
             # Log the primary metric
             primary = self.ablation_config.primary_metric
             metric_val = result.metrics.get(primary, 0)
+            device_note = " [CPU fallback]" if run_device.type == "cpu" and self.device.type != "cpu" else ""
             self.logger.success(
                 f"Experiment {experiment.experiment_id} completed: "
                 f"{primary} = {metric_val:.4f} "
-                f"({result.training_time:.1f}s)"
+                f"({result.training_time:.1f}s){device_note}"
             )
 
             # 6. Save per-epoch results to disk
