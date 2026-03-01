@@ -1,0 +1,16 @@
+\begin{table}[h]
+\centering
+\caption{Ablation Study Results for MOE Configurations}
+\label{tab:ablation}
+\begin{tabular}{lcccccc}
+\toprule
+Experiment & Bleu & Meteor & Rouge L & Cider & Exact Match & F1 \\
+\midrule
+full/expert\_choice\_k1 & \textbf{6.15} & 27.88 & 41.81 & 67.15 & \textbf{6.74} & 45.43 \\
+full/soft\_k1 & 6.07 & \textbf{28.36} & 42.09 & \textbf{69.64} & 6.01 & \textbf{46.13} \\
+full/noisy\_topk\_k4 & 5.80 & 28.01 & \textbf{42.12} & 69.62 & 6.31 & 45.84 \\
+full/topk\_k1 & 5.45 & 27.07 & 40.97 & 64.78 & 6.20 & 44.53 \\
+full/noisy\_topk\_k1 & 5.22 & 27.04 & 41.24 & 65.02 & 6.61 & 44.60 \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,505 @@
+{
+  "expert_contributions": [
+    {
+      "expert_type": "vision",
+      "importance_rank": 1,
+      "importance_score": 0.0,
+      "solo_score": 0.0,
+      "marginal_contribution": 0.0,
+      "is_essential": false,
+      "is_redundant": true,
+      "recommendation": "REDUNDANT: vision has minimal impact (0.00%). Consider removing to save compute."
+    },
+    {
+      "expert_type": "text",
+      "importance_rank": 2,
+      "importance_score": 0.0,
+      "solo_score": 0.0,
+      "marginal_contribution": 0.0,
+      "is_essential": false,
+      "is_redundant": true,
+      "recommendation": "REDUNDANT: text has minimal impact (0.00%). Consider removing to save compute."
+    },
+    {
+      "expert_type": "multimodal",
+      "importance_rank": 3,
+      "importance_score": 0.0,
+      "solo_score": 0.0,
+      "marginal_contribution": 0.0,
+      "is_essential": false,
+      "is_redundant": true,
+      "recommendation": "REDUNDANT: multimodal has minimal impact (0.00%). Consider removing to save compute."
+    },
+    {
+      "expert_type": "specialized",
+      "importance_rank": 4,
+      "importance_score": 0.0,
+      "solo_score": 0.0,
+      "marginal_contribution": 0.0,
+      "is_essential": false,
+      "is_redundant": true,
+      "recommendation": "REDUNDANT: specialized has minimal impact (0.00%). Consider removing to save compute."
+    }
+  ],
+  "pairwise_synergy": [
+    {
+      "expert_a": "vision",
+      "expert_b": "text",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    },
+    {
+      "expert_a": "vision",
+      "expert_b": "multimodal",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    },
+    {
+      "expert_a": "vision",
+      "expert_b": "specialized",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    },
+    {
+      "expert_a": "text",
+      "expert_b": "multimodal",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    },
+    {
+      "expert_a": "text",
+      "expert_b": "specialized",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    },
+    {
+      "expert_a": "multimodal",
+      "expert_b": "specialized",
+      "pair_score": 0.0,
+      "sum_solo": 0.0,
+      "synergy": 0.0,
+      "is_synergistic": false
+    }
+  ],
+  "router_analysis": {
+    "best_router": "Router=expert_choice | K=1 | lb=0.0",
+    "best_router_score": 0.061463,
+    "worst_router": "Router=noisy_topk | K=1 | noise=on | lb=0.0",
+    "worst_router_score": 0.05224,
+    "router_scores": {
+      "expert_choice": 0.0614634907261082,
+      "noisy_topk": 0.05510289782899813,
+      "soft": 0.060666493032794595,
+      "topk": 0.054545081429393634
+    },
+    "best_top_k": 4,
+    "top_k_scores": {
+      "1": 0.05722876953770306,
+      "4": 0.05796578269548043
+    },
+    "best_lb_weight": 0.01,
+    "sensitivity_rating": "low",
+    "recommendation": "Best router: expert_choice (avg 6.15%). Best top_k: 4. Router sensitivity: low."
+  },
+  "recommendation": {
+    "recommended_experts": [],
+    "recommended_router": "expert_choice",
+    "recommended_top_k": 4,
+    "recommended_lb_weight": 0.01,
+    "expected_score": 0.061463,
+    "reasoning": "Redundant experts (can remove): vision, text, multimodal, specialized. Best router: expert_choice with top_k=4."
+  },
+  "key_findings": [
+    "Baseline (all experts, default router): bleu = 6.15%",
+    "Expert importance ranking (LOO drops): vision (+0.00%), text (+0.00%), multimodal (+0.00%), specialized (+0.00%)",
+    "Most important expert: vision (removing it drops bleu by 0.00%)",
+    "Least important expert: specialized (removing it changes bleu by only 0.00%)",
+    "Router sensitivity: low. Best: Router=expert_choice | K=1 | lb=0.0",
+    "Best overall experiment: full__expert_choice_k1 (bleu = 6.15%)"
+  ],
+  "evaluation_data": {
+    "primary_metric": "bleu",
+    "num_experiments": 5,
+    "ranking": [
+      [
+        "full__expert_choice_k1",
+        0.0614634907261082
+      ],
+      [
+        "full__soft_k1",
+        0.060666493032794595
+      ],
+      [
+        "full__noisy_topk_k4",
+        0.05796578269548043
+      ],
+      [
+        "full__topk_k1",
+        0.054545081429393634
+      ],
+      [
+        "full__noisy_topk_k1",
+        0.05224001296251583
+      ]
+    ],
+    "deltas": {
+      "full__expert_choice_k1": 0.0,
+      "full__noisy_topk_k1": -0.009223477763592364,
+      "full__noisy_topk_k4": -0.0034977080306277664,
+      "full__soft_k1": -0.0007969976933136017,
+      "full__topk_k1": -0.006918409296714563
+    },
+    "expert_importance": [
+      {
+        "expert_type": "vision",
+        "solo_metrics": {},
+        "baseline_metric": 0.0614634907261082,
+        "loo_metrics": {},
+        "importance_score": 0.0,
+        "solo_score": 0.0
+      },
+      {
+        "expert_type": "text",
+        "solo_metrics": {},
+        "baseline_metric": 0.0614634907261082,
+        "loo_metrics": {},
+        "importance_score": 0.0,
+        "solo_score": 0.0
+      },
+      {
+        "expert_type": "multimodal",
+        "solo_metrics": {},
+        "baseline_metric": 0.0614634907261082,
+        "loo_metrics": {},
+        "importance_score": 0.0,
+        "solo_score": 0.0
+      },
+      {
+        "expert_type": "specialized",
+        "solo_metrics": {},
+        "baseline_metric": 0.0614634907261082,
+        "loo_metrics": {},
+        "importance_score": 0.0,
+        "solo_score": 0.0
+      }
+    ],
+    "metric_summaries": {
+      "bleu": {
+        "name": "bleu",
+        "mean": 0.05737617216925854,
+        "std": 0.003945732857061428,
+        "min": 0.05224001296251583,
+        "max": 0.0614634907261082,
+        "best_experiment": "full__expert_choice_k1",
+        "values": {
+          "full__expert_choice_k1": 0.0614634907261082,
+          "full__noisy_topk_k1": 0.05224001296251583,
+          "full__noisy_topk_k4": 0.05796578269548043,
+          "full__soft_k1": 0.060666493032794595,
+          "full__topk_k1": 0.054545081429393634
+        }
+      },
+      "meteor": {
+        "name": "meteor",
+        "mean": 0.2767066144170318,
+        "std": 0.005906646415397803,
+        "min": 0.27035769388304104,
+        "max": 0.28362326041503166,
+        "best_experiment": "full__soft_k1",
+        "values": {
+          "full__expert_choice_k1": 0.2787842128862858,
+          "full__noisy_topk_k1": 0.27035769388304104,
+          "full__noisy_topk_k4": 0.2800524542947909,
+          "full__soft_k1": 0.28362326041503166,
+          "full__topk_k1": 0.27071545060600977
+        }
+      },
+      "rouge_l": {
+        "name": "rouge_l",
+        "mean": 0.4164503222361028,
+        "std": 0.005145819901030978,
+        "min": 0.4097418589018627,
+        "max": 0.4211783309882015,
+        "best_experiment": "full__noisy_topk_k4",
+        "values": {
+          "full__expert_choice_k1": 0.4180825798491017,
+          "full__noisy_topk_k1": 0.4123914892737471,
+          "full__noisy_topk_k4": 0.4211783309882015,
+          "full__soft_k1": 0.4208573521676011,
+          "full__topk_k1": 0.4097418589018627
+        }
+      },
+      "cider": {
+        "name": "cider",
+        "mean": 0.6724396592163594,
+        "std": 0.0236778770979428,
+        "min": 0.6478049020544954,
+        "max": 0.6964266969238986,
+        "best_experiment": "full__soft_k1",
+        "values": {
+          "full__expert_choice_k1": 0.671479711558791,
+          "full__noisy_topk_k1": 0.6502423577918576,
+          "full__noisy_topk_k4": 0.6962446277527544,
+          "full__soft_k1": 0.6964266969238986,
+          "full__topk_k1": 0.6478049020544954
+        }
+      },
+      "exact_match": {
+        "name": "exact_match",
+        "mean": 0.06375404530744336,
+        "std": 0.002970234067369656,
+        "min": 0.06014023732470335,
+        "max": 0.0674217907227616,
+        "best_experiment": "full__expert_choice_k1",
+        "values": {
+          "full__expert_choice_k1": 0.0674217907227616,
+          "full__noisy_topk_k1": 0.06607335490830636,
+          "full__noisy_topk_k4": 0.06310679611650485,
+          "full__soft_k1": 0.06014023732470335,
+          "full__topk_k1": 0.06202804746494067
+        }
+      },
+      "precision": {
+        "name": "precision",
+        "mean": 0.5548116042533519,
+        "std": 0.006085698743401486,
+        "min": 0.5464581085940309,
+        "max": 0.5607829917295937,
+        "best_experiment": "full__soft_k1",
+        "values": {
+          "full__expert_choice_k1": 0.5555709662505779,
+          "full__noisy_topk_k1": 0.5511057173678533,
+          "full__noisy_topk_k4": 0.5601402373247033,
+          "full__soft_k1": 0.5607829917295937,
+          "full__topk_k1": 0.5464581085940309
+        }
+      },
+      "recall": {
+        "name": "recall",
+        "mean": 0.407157834973369,
+        "std": 0.007676779647138204,
+        "min": 0.3989096282178806,
+        "max": 0.41658073363170445,
+        "best_experiment": "full__soft_k1",
+        "values": {
+          "full__expert_choice_k1": 0.40830477205881743,
+          "full__noisy_topk_k1": 0.3989096282178806,
+          "full__noisy_topk_k4": 0.4121165549361342,
+          "full__soft_k1": 0.41658073363170445,
+          "full__topk_k1": 0.39987748602230805
+        }
+      },
+      "f1": {
+        "name": "f1",
+        "mean": 0.4530390408905067,
+        "std": 0.00721761130834339,
+        "min": 0.445270976177125,
+        "max": 0.46128749890885806,
+        "best_experiment": "full__soft_k1",
+        "values": {
+          "full__expert_choice_k1": 0.4542632980513715,
+          "full__noisy_topk_k1": 0.4459801046370626,
+          "full__noisy_topk_k4": 0.4583933266781164,
+          "full__soft_k1": 0.46128749890885806,
+          "full__topk_k1": 0.445270976177125
+        }
+      },
+      "loss": {
+        "name": "loss",
+        "mean": 4.861202066520165,
+        "std": 0.030380304385516102,
+        "min": 4.832227094420071,
+        "max": 4.89514226337959,
+        "best_experiment": "full__noisy_topk_k4",
+        "values": {
+          "full__expert_choice_k1": 4.854426244209552,
+          "full__noisy_topk_k1": 4.89514226337959,
+          "full__noisy_topk_k4": 4.832227094420071,
+          "full__soft_k1": 4.833360063618627,
+          "full__topk_k1": 4.890854666972983
+        }
+      },
+      "perplexity": {
+        "name": "perplexity",
+        "mean": 129.2271674250011,
+        "std": 3.935264112898956,
+        "min": 125.4901280372431,
+        "max": 133.63901720049162,
+        "best_experiment": "full__noisy_topk_k1",
+        "values": {
+          "full__expert_choice_k1": 128.3070531768994,
+          "full__noisy_topk_k1": 133.63901720049162,
+          "full__noisy_topk_k4": 125.4901280372431,
+          "full__soft_k1": 125.63238505822659,
+          "full__topk_k1": 133.06725365214476
+        }
+      }
+    },
+    "metric_table": {
+      "full__expert_choice_k1": {
+        "bleu": 0.0614634907261082,
+        "meteor": 0.2787842128862858,
+        "rouge_l": 0.4180825798491017,
+        "cider": 0.671479711558791,
+        "exact_match": 0.0674217907227616,
+        "precision": 0.5555709662505779,
+        "recall": 0.40830477205881743,
+        "f1": 0.4542632980513715,
+        "loss": 4.854426244209552,
+        "perplexity": 128.3070531768994
+      },
+      "full__noisy_topk_k1": {
+        "bleu": 0.05224001296251583,
+        "meteor": 0.27035769388304104,
+        "rouge_l": 0.4123914892737471,
+        "cider": 0.6502423577918576,
+        "exact_match": 0.06607335490830636,
+        "precision": 0.5511057173678533,
+        "recall": 0.3989096282178806,
+        "f1": 0.4459801046370626,
+        "loss": 4.89514226337959,
+        "perplexity": 133.63901720049162
+      },
+      "full__noisy_topk_k4": {
+        "bleu": 0.05796578269548043,
+        "meteor": 0.2800524542947909,
+        "rouge_l": 0.4211783309882015,
+        "cider": 0.6962446277527544,
+        "exact_match": 0.06310679611650485,
+        "precision": 0.5601402373247033,
+        "recall": 0.4121165549361342,
+        "f1": 0.4583933266781164,
+        "loss": 4.832227094420071,
+        "perplexity": 125.4901280372431
+      },
+      "full__soft_k1": {
+        "bleu": 0.060666493032794595,
+        "meteor": 0.28362326041503166,
+        "rouge_l": 0.4208573521676011,
+        "cider": 0.6964266969238986,
+        "exact_match": 0.06014023732470335,
+        "precision": 0.5607829917295937,
+        "recall": 0.41658073363170445,
+        "f1": 0.46128749890885806,
+        "loss": 4.833360063618627,
+        "perplexity": 125.63238505822659
+      },
+      "full__topk_k1": {
+        "bleu": 0.054545081429393634,
+        "meteor": 0.27071545060600977,
+        "rouge_l": 0.4097418589018627,
+        "cider": 0.6478049020544954,
+        "exact_match": 0.06202804746494067,
+        "precision": 0.5464581085940309,
+        "recall": 0.39987748602230805,
+        "f1": 0.445270976177125,
+        "loss": 4.890854666972983,
+        "perplexity": 133.06725365214476
+      }
+    },
+    "moe_metric_table": {
+      "full__expert_choice_k1": {
+        "load_balance_loss": null,
+        "routing_entropy": 0.11452113091945648,
+        "load_imbalance": 0.0,
+        "active_experts": 4
+      },
+      "full__noisy_topk_k1": {
+        "load_balance_loss": 0.010737116448581219,
+        "routing_entropy": 1.2479641437530518,
+        "load_imbalance": 0.0,
+        "active_experts": 4
+      },
+      "full__noisy_topk_k4": {
+        "load_balance_loss": 0.03999999910593033,
+        "routing_entropy": 0.7161570191383362,
+        "load_imbalance": 0.0,
+        "active_experts": 4
+      },
+      "full__soft_k1": {
+        "load_balance_loss": null,
+        "routing_entropy": 0.7209575772285461,
+        "load_imbalance": 0.0,
+        "active_experts": 4
+      },
+      "full__topk_k1": {
+        "load_balance_loss": 0.01072675921022892,
+        "routing_entropy": 1.2493504285812378,
+        "load_imbalance": 0.0,
+        "active_experts": 4
+      }
+    },
+    "router_comparison": {
+      "Router=expert_choice | K=1 | lb=0.0": {
+        "loss": 4.854426244209552,
+        "perplexity": 128.3070531768994,
+        "bleu": 0.0614634907261082,
+        "meteor": 0.2787842128862858,
+        "rouge_l": 0.4180825798491017,
+        "cider": 0.671479711558791,
+        "exact_match": 0.0674217907227616,
+        "precision": 0.5555709662505779,
+        "recall": 0.40830477205881743,
+        "f1": 0.4542632980513715
+      },
+      "Router=noisy_topk | K=1 | noise=on | lb=0.0": {
+        "loss": 4.89514226337959,
+        "perplexity": 133.63901720049162,
+        "bleu": 0.05224001296251583,
+        "meteor": 0.27035769388304104,
+        "rouge_l": 0.4123914892737471,
+        "cider": 0.6502423577918576,
+        "exact_match": 0.06607335490830636,
+        "precision": 0.5511057173678533,
+        "recall": 0.3989096282178806,
+        "f1": 0.4459801046370626
+      },
+      "Router=noisy_topk | K=4 | noise=on | lb=0.0": {
+        "loss": 4.832227094420071,
+        "perplexity": 125.4901280372431,
+        "bleu": 0.05796578269548043,
+        "meteor": 0.2800524542947909,
+        "rouge_l": 0.4211783309882015,
+        "cider": 0.6962446277527544,
+        "exact_match": 0.06310679611650485,
+        "precision": 0.5601402373247033,
+        "recall": 0.4121165549361342,
+        "f1": 0.4583933266781164
+      },
+      "Router=soft | K=1 | lb=0.0": {
+        "loss": 4.833360063618627,
+        "perplexity": 125.63238505822659,
+        "bleu": 0.060666493032794595,
+        "meteor": 0.28362326041503166,
+        "rouge_l": 0.4208573521676011,
+        "cider": 0.6964266969238986,
+        "exact_match": 0.06014023732470335,
+        "precision": 0.5607829917295937,
+        "recall": 0.41658073363170445,
+        "f1": 0.46128749890885806
+      },
+      "Router=topk | K=1 | lb=0.0": {
+        "loss": 4.890854666972983,
+        "perplexity": 133.06725365214476,
+        "bleu": 0.054545081429393634,
+        "meteor": 0.27071545060600977,
+        "rouge_l": 0.4097418589018627,
+        "cider": 0.6478049020544954,
+        "exact_match": 0.06202804746494067,
+        "precision": 0.5464581085940309,
+        "recall": 0.39987748602230805,
+        "f1": 0.445270976177125
+      }
+    }
+  }
+}

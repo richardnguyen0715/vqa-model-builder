@@ -1,0 +1,14 @@
+\begin{table}[h]
+\centering
+\caption{Ablation Study Results for MOE Configurations}
+\label{tab:ablation}
+\begin{tabular}{lcccccc}
+\toprule
+Experiment & Bleu & Meteor & Rouge L & Cider & Exact Match & F1 \\
+\midrule
+subset\_specialized\_text\_vision/noisy\_topk\_k2 & \textbf{6.56} & 27.79 & 41.96 & 67.98 & 6.50 & 45.57 \\
+subset\_text\_vision/noisy\_topk\_k2 & 6.45 & 27.93 & 42.17 & 69.06 & \textbf{6.98} & 45.64 \\
+subset\_specialized\_vision/noisy\_topk\_k2 & 6.43 & \textbf{27.94} & \textbf{42.22} & \textbf{69.08} & 6.96 & \textbf{45.70} \\
+\bottomrule
+\end{tabular}
+\end{table}

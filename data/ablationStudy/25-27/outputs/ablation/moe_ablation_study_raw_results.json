@@ -1,0 +1,248 @@
+{
+  "primary_metric": "bleu",
+  "num_experiments": 3,
+  "ranking": [
+    [
+      "subset_specialized_text_vision__noisy_topk_k2",
+      0.06564177840149207
+    ],
+    [
+      "subset_text_vision__noisy_topk_k2",
+      0.06447909298872287
+    ],
+    [
+      "subset_specialized_vision__noisy_topk_k2",
+      0.0642662557878426
+    ]
+  ],
+  "deltas": {
+    "subset_specialized_text_vision__noisy_topk_k2": 0.06564177840149207,
+    "subset_specialized_vision__noisy_topk_k2": 0.0642662557878426,
+    "subset_text_vision__noisy_topk_k2": 0.06447909298872287
+  },
+  "expert_importance": [
+    {
+      "expert_type": "vision",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "text",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "multimodal",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    },
+    {
+      "expert_type": "specialized",
+      "solo_metrics": {},
+      "baseline_metric": 0.0,
+      "loo_metrics": {},
+      "importance_score": 0.0,
+      "solo_score": 0.0
+    }
+  ],
+  "metric_summaries": {
+    "bleu": {
+      "name": "bleu",
+      "mean": 0.06479570905935252,
+      "std": 0.0007404052385693826,
+      "min": 0.0642662557878426,
+      "max": 0.06564177840149207,
+      "best_experiment": "subset_specialized_text_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.06564177840149207,
+        "subset_specialized_vision__noisy_topk_k2": 0.0642662557878426,
+        "subset_text_vision__noisy_topk_k2": 0.06447909298872287
+      }
+    },
+    "meteor": {
+      "name": "meteor",
+      "mean": 0.2788877006153488,
+      "std": 0.0008273875527222584,
+      "min": 0.277935941124907,
+      "max": 0.2794355912393672,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.277935941124907,
+        "subset_specialized_vision__noisy_topk_k2": 0.2794355912393672,
+        "subset_text_vision__noisy_topk_k2": 0.27929156948177225
+      }
+    },
+    "rouge_l": {
+      "name": "rouge_l",
+      "mean": 0.42116969515584507,
+      "std": 0.001349895638826361,
+      "min": 0.4196445165592729,
+      "max": 0.4222108359253909,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.4196445165592729,
+        "subset_specialized_vision__noisy_topk_k2": 0.4222108359253909,
+        "subset_text_vision__noisy_topk_k2": 0.4216537329828715
+      }
+    },
+    "cider": {
+      "name": "cider",
+      "mean": 0.6870694992862224,
+      "std": 0.006328549876233108,
+      "min": 0.6797629097338564,
+      "max": 0.6908269831737008,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.6797629097338564,
+        "subset_specialized_vision__noisy_topk_k2": 0.6908269831737008,
+        "subset_text_vision__noisy_topk_k2": 0.6906186049511099
+      }
+    },
+    "exact_match": {
+      "name": "exact_match",
+      "mean": 0.06814095649047107,
+      "std": 0.002728153704691392,
+      "min": 0.06499460625674218,
+      "max": 0.06984897518878101,
+      "best_experiment": "subset_text_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.06499460625674218,
+        "subset_specialized_vision__noisy_topk_k2": 0.06957928802588997,
+        "subset_text_vision__noisy_topk_k2": 0.06984897518878101
+      }
+    },
+    "precision": {
+      "name": "precision",
+      "mean": 0.56147668704303,
+      "std": 0.0006969141247577293,
+      "min": 0.5608728874505572,
+      "max": 0.5622393024092053,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.5608728874505572,
+        "subset_specialized_vision__noisy_topk_k2": 0.5622393024092053,
+        "subset_text_vision__noisy_topk_k2": 0.5613178712693276
+      }
+    },
+    "recall": {
+      "name": "recall",
+      "mean": 0.40788616673190575,
+      "std": 0.000464607862991257,
+      "min": 0.4075257049973878,
+      "max": 0.40841050654966515,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.40772228864866406,
+        "subset_specialized_vision__noisy_topk_k2": 0.40841050654966515,
+        "subset_text_vision__noisy_topk_k2": 0.4075257049973878
+      }
+    },
+    "f1": {
+      "name": "f1",
+      "mean": 0.45638425417876843,
+      "std": 0.0006674790634109662,
+      "min": 0.45570230462791855,
+      "max": 0.45703625452816393,
+      "best_experiment": "subset_specialized_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 0.45570230462791855,
+        "subset_specialized_vision__noisy_topk_k2": 0.45703625452816393,
+        "subset_text_vision__noisy_topk_k2": 0.4564142033802228
+      }
+    },
+    "loss": {
+      "name": "loss",
+      "mean": 4.839324307167666,
+      "std": 0.0039656721274769205,
+      "min": 4.837010527479237,
+      "max": 4.843903385359665,
+      "best_experiment": "subset_text_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 4.843903385359665,
+        "subset_specialized_vision__noisy_topk_k2": 4.837059008664098,
+        "subset_text_vision__noisy_topk_k2": 4.837010527479237
+      }
+    },
+    "perplexity": {
+      "name": "perplexity",
+      "mean": 126.38458919397492,
+      "std": 0.5017721979374634,
+      "min": 126.09183964055833,
+      "max": 126.963975070834,
+      "best_experiment": "subset_specialized_text_vision__noisy_topk_k2",
+      "values": {
+        "subset_specialized_text_vision__noisy_topk_k2": 126.963975070834,
+        "subset_specialized_vision__noisy_topk_k2": 126.09795287053245,
+        "subset_text_vision__noisy_topk_k2": 126.09183964055833
+      }
+    }
+  },
+  "metric_table": {
+    "subset_specialized_text_vision__noisy_topk_k2": {
+      "bleu": 0.06564177840149207,
+      "meteor": 0.277935941124907,
+      "rouge_l": 0.4196445165592729,
+      "cider": 0.6797629097338564,
+      "exact_match": 0.06499460625674218,
+      "precision": 0.5608728874505572,
+      "recall": 0.40772228864866406,
+      "f1": 0.45570230462791855,
+      "loss": 4.843903385359665,
+      "perplexity": 126.963975070834
+    },
+    "subset_specialized_vision__noisy_topk_k2": {
+      "bleu": 0.0642662557878426,
+      "meteor": 0.2794355912393672,
+      "rouge_l": 0.4222108359253909,
+      "cider": 0.6908269831737008,
+      "exact_match": 0.06957928802588997,
+      "precision": 0.5622393024092053,
+      "recall": 0.40841050654966515,
+      "f1": 0.45703625452816393,
+      "loss": 4.837059008664098,
+      "perplexity": 126.09795287053245
+    },
+    "subset_text_vision__noisy_topk_k2": {
+      "bleu": 0.06447909298872287,
+      "meteor": 0.27929156948177225,
+      "rouge_l": 0.4216537329828715,
+      "cider": 0.6906186049511099,
+      "exact_match": 0.06984897518878101,
+      "precision": 0.5613178712693276,
+      "recall": 0.4075257049973878,
+      "f1": 0.4564142033802228,
+      "loss": 4.837010527479237,
+      "perplexity": 126.09183964055833
+    }
+  },
+  "moe_metric_table": {
+    "subset_specialized_text_vision__noisy_topk_k2": {
+      "load_balance_loss": 0.02172473818063736,
+      "routing_entropy": 0.8034945130348206,
+      "load_imbalance": 0.0,
+      "active_experts": 3
+    },
+    "subset_specialized_vision__noisy_topk_k2": {
+      "load_balance_loss": 0.019966330379247665,
+      "routing_entropy": 0.6246591806411743,
+      "load_imbalance": 0.0,
+      "active_experts": 2
+    },
+    "subset_text_vision__noisy_topk_k2": {
+      "load_balance_loss": 0.020069139078259468,
+      "routing_entropy": 0.6304174065589905,
+      "load_imbalance": 0.0,
+      "active_experts": 2
+    }
+  },
+  "router_comparison": {}
+}

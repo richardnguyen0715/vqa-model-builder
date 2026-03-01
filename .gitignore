@@ -224,3 +224,6 @@ logs/
 
 # Models
 checkpoints/
+
+
+*.DS_Store

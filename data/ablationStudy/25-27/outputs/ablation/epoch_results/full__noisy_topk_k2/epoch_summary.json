@@ -1,0 +1,53 @@
+{
+  "experiment_id": "full__noisy_topk_k2",
+  "model_type": "generative",
+  "total_epochs": 3,
+  "best_metric": 0.0,
+  "primary_metric": "bleu",
+  "status": "interrupted",
+  "training_time": 2424.082111120224,
+  "training_history": [
+    {
+      "loss": 9.95746356152408,
+      "perplexity": 21109.18560630044,
+      "learning_rate": 3.6132132670162744e-06
+    },
+    {
+      "loss": 7.4043958270691235,
+      "perplexity": 1643.1917641294237,
+      "learning_rate": 1.0404067883540857e-05
+    },
+    {
+      "loss": 6.0604643865439245,
+      "perplexity": 428.57441484568596,
+      "learning_rate": 1.719253837007673e-05
+    }
+  ],
+  "validation_history": [
+    {
+      "loss": 8.888047933578491,
+      "perplexity": 7244.862917374654,
+      "bleu": 0,
+      "meteor": 0.0,
+      "rouge_l": 0.0,
+      "cider": 0.0,
+      "exact_match": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    {
+      "loss": 6.427322301371344,
+      "perplexity": 618.515530444729,
+      "bleu": 3.3480190876146247e-05,
+      "meteor": 0.07961895060389232,
+      "rouge_l": 0.2117458273583345,
+      "cider": 0.19902356006437985,
+      "exact_match": 0.022653721682847898,
+      "precision": 0.44147788565264295,
+      "recall": 0.15099136787041317,
+      "f1": 0.21390097024972335
+    }
+  ],
+  "saved_at": "2026-02-24T21:22:48.879488"
+}

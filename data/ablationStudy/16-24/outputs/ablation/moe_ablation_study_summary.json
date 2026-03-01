@@ -1,0 +1,31 @@
+{
+  "study_name": "moe_ablation_study",
+  "total_experiments": 27,
+  "completed": 9,
+  "failed": 0,
+  "skipped": 0,
+  "total_time_seconds": 5265.912531137466,
+  "total_time_human": "1h 27m",
+  "key_findings": [
+    "Baseline (all experts, default router): bleu = 6.39%",
+    "Expert importance ranking (LOO drops): vision (+0.00%), text (+0.00%), multimodal (+0.00%), specialized (+0.00%)",
+    "Most important expert: vision (removing it drops bleu by 0.00%)",
+    "Least important expert: specialized (removing it changes bleu by only 0.00%)",
+    "Strongest synergy: multimodal + specialized (synergy = +6.12% over best solo)",
+    "Router sensitivity: low. Best: Router=topk | K=4 | lb=0.0",
+    "Best overall experiment: full__topk_k4 (bleu = 6.45%)"
+  ],
+  "report_paths": {
+    "markdown": "outputs/ablation/moe_ablation_study_report.md",
+    "csv_results": "outputs/ablation/ablation_results.csv",
+    "csv_contributions": "outputs/ablation/expert_contributions.csv",
+    "latex": "outputs/ablation/moe_ablation_study_table.tex",
+    "json_analysis": "outputs/ablation/moe_ablation_study_analysis.json",
+    "json_raw": "outputs/ablation/moe_ablation_study_raw_results.json"
+  },
+  "best_experiment": {
+    "experiment_id": "full__topk_k4",
+    "bleu": 0.06448949190652833,
+    "checkpoint_path": "checkpoints/ablation/full__topk_k4/best_generative_model.pt"
+  }
+}

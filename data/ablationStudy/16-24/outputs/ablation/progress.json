@@ -1,0 +1,27 @@
+{
+  "current_index": 26,
+  "total_experiments": 27,
+  "completed": 9,
+  "failed": 0,
+  "last_updated": "2026-02-25T17:40:36.254192",
+  "completed_ids": [
+    "subset_multimodal_specialized_vision__noisy_topk_k2",
+    "subset_multimodal_specialized__noisy_topk_k2",
+    "full__topk_k2",
+    "subset_multimodal_text_vision__noisy_topk_k2",
+    "subset_multimodal_vision__noisy_topk_k2",
+    "subset_multimodal_text__noisy_topk_k2",
+    "subset_specialized_vision__noisy_topk_k2",
+    "full__topk_k4",
+    "subset_multimodal_specialized_text__noisy_topk_k2",
+    "full__topk_k2",
+    "subset_multimodal_specialized_vision__noisy_topk_k2",
+    "full__topk_k4",
+    "subset_multimodal_specialized__noisy_topk_k2",
+    "subset_multimodal_text__noisy_topk_k2",
+    "subset_multimodal_text_vision__noisy_topk_k2",
+    "subset_multimodal_specialized_text__noisy_topk_k2",
+    "subset_multimodal_vision__noisy_topk_k2",
+    "subset_specialized_vision__noisy_topk_k2"
+  ]
+}
