@@ -534,12 +534,17 @@ python -m src.core.generative_vqa_pipeline \
     --visual-backbone openai/clip-vit-base-patch32 \
     --text-encoder vinai/phobert-base \
     --batch-size 8 \
-    --num-epochs 20 \
+    --epochs 20 \
     --learning-rate 5e-5 \
     --use-moe \
-    --moe-type standard \
+    --moe-type vqa \
     --moe-position fusion \
     --num-experts 8 \
+    --num-vision-experts 2 \
+    --num-text-experts 2 \
+    --num-multimodal-experts 2 \
+    --num-specialized-experts 2 \
+    --vietnamese-optimized \
     --enable-resource-management
 ```
 
@@ -552,9 +557,38 @@ python -m src.core.generative_vqa_pipeline \
 | `inference` | `--mode inference` | Sinh đáp án cho ảnh + câu hỏi |
 | `demo` | `--mode demo` | Demo tương tác |
 
-#### 5.3 MOE Options cho Generative
+#### 5.3 Loại MOE (MOE Types)
+
+Hệ thống hỗ trợ 3 loại MOE với mục đích khác nhau:
+
+| MOE Type | Mô tả | Expert Types | Khi nào dùng |
+|----------|--------|--------------|---------------|
+| **`standard`** | MOE cơ bản với FeedForward experts đồng nhất | 8 FeedForwardExpert giống hệt nhau | Baseline, thí nghiệm đơn giản |
+| **`vqa`** | MOE chuyên biệt cho VQA với 4 loại expert khác nhau | Vision, Text, Multimodal, Specialized (SAM, Detection, OCR, Scene) | **Khuyến nghị** - Tận dụng đặc thù VQA |
+| **`sparse`** | Sparse MOE với expert capacity limiting | FeedForward với capacity constraints | Khi cần kiểm soát computation cost |
+
+**Chi tiết từng loại:**
+
+##### 5.3.1 Standard MOE (Baseline)
 
 ```bash
+# Tạo 8 FeedForward experts đồng nhất
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --use-moe \
+    --moe-type standard \
+    --num-experts 8
+```
+
+**Đặc điểm:**
+- Tất cả experts giống nhau: Linear(768 → 2048) + ReLU + Linear(2048 → 768)
+- Không chuyên biệt theo modality hay task
+- Dùng làm baseline để so sánh
+
+##### 5.3.2 VQA MOE (Specialized - Khuyến nghị)
+
+```bash
+# Tạo 4 loại expert chuyên biệt: Vision, Text, Multimodal, Specialized
 python -m src.core.generative_vqa_pipeline \
     --mode train \
     --use-moe \
@@ -565,10 +599,56 @@ python -m src.core.generative_vqa_pipeline \
     --num-text-experts 2 \
     --num-multimodal-experts 2 \
     --num-specialized-experts 2 \
-    --expert-top-k 2
+    --vietnamese-optimized
 ```
 
-#### 5.4 Generation Options
+**Đặc điểm:**
+- **Vision Experts (2)**: Xử lý đặc trưng hình ảnh (attention over image patches)
+- **Text Experts (2)**: Xử lý đặc trưng ngôn ngữ (attention over text tokens)
+- **Multimodal Experts (2)**: Xử lý tương tác image-text (cross-modal attention)
+- **Specialized Experts (2)**: Task-specific experts
+  - **SAM Expert**: Segmentation (phân vùng đối tượng)
+  - **Detection Expert**: Object detection (phát hiện đối tượng)
+  - **OCR Expert**: Text recognition với Vietnamese optimization (nhận dạng chữ tiếng Việt)
+  - **Scene Expert**: Scene understanding (hiểu ngữ cảnh cảnh)
+
+> ⚠️ **Lưu ý**: Chỉ khi dùng `--moe-type vqa` mới có các specialized experts (SAM, Detection, OCR, Scene). Với `--moe-type standard` chỉ có FeedForward experts đơn giản.
+
+##### 5.3.3 Sparse MOE
+
+```bash
+# Expert capacity limiting để giảm computation
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --use-moe \
+    --moe-type sparse \
+    --num-experts 8 \
+    --expert-capacity-factor 1.25
+```
+
+**Đặc điểm:**
+- Expert capacity = (tokens_per_batch / num_experts) × capacity_factor
+- Tokens vượt capacity bị drop → sparse computation
+- Giảm cost khi số experts lớn
+
+#### 5.4 MOE Position (Vị trí đặt MOE Layer)
+
+```bash
+# Đặt MOE ở fusion layer, decoder layers, hoặc cả hai
+python -m src.core.generative_vqa_pipeline \
+    --mode train \
+    --use-moe \
+    --moe-type vqa \
+    --moe-position both  # fusion | decoder | both
+```
+
+| Position | Layer | Tác dụng |
+|----------|--------|----------|
+| `fusion` | Sau cross-modal fusion | Chuyên biệt hoá multimodal features |
+| `decoder` | Mỗi decoder layer | Chuyên biệt hoá generation |
+| `both` | Fusion + Decoder | Chuyên biệt hoá cả fusion và generation |
+
+#### 5.5 Generation Options
 
 ```bash
 python -m src.core.generative_vqa_pipeline \
@@ -582,14 +662,14 @@ python -m src.core.generative_vqa_pipeline \
     --checkpoint checkpoints/generative/best_generative_model.pt
 ```
 
-#### 5.5 Tham số đầy đủ Generative Pipeline
+#### 5.6 Tham số đầy đủ Generative Pipeline
 
 | Flag | Mặc định | Mô tả |
 |------|----------|-------|
 | `--mode` | `train` | `train` / `evaluate` / `inference` / `demo` |
 | `--config` | — | YAML config path |
 | `--batch-size` | `16` | Batch size (giảm nếu thiếu VRAM) |
-| `--num-epochs` | `20` | Số epoch |
+| `--epochs` | `20` | Số epoch |
 | `--learning-rate` | `5e-5` | Learning rate |
 | `--hidden-size` | `768` | Hidden dimension |
 | `--num-decoder-layers` | `6` | Số layer decoder |
@@ -1237,8 +1317,9 @@ python -m src.core.vqa_pipeline --mode inference --resume checkpoints/best_model
 # ═══════════════════════════════════════════════
 #  GENERATIVE VQA
 # ═══════════════════════════════════════════════
-python -m src.core.generative_vqa_pipeline --mode train      # Train generative
-python -m src.core.generative_vqa_pipeline --mode train --use-moe --moe-type vqa   # Với MOE
+python -m src.core.generative_vqa_pipeline --mode train      # Train generative (baseline)
+python -m src.core.generative_vqa_pipeline --mode train --use-moe --moe-type standard --num-experts 8  # Standard MOE (FeedForward experts)
+python -m src.core.generative_vqa_pipeline --mode train --use-moe --moe-type vqa --num-vision-experts 2 --num-text-experts 2 --num-multimodal-experts 2 --num-specialized-experts 2  # VQA MOE (Specialized experts: SAM, Detection, OCR, Scene)
 python -m src.core.generative_vqa_pipeline --mode evaluate   # Evaluate NLG metrics
 python -m src.core.generative_vqa_pipeline --mode inference --num-beams 5  # Beam search
 python -m src.core.generative_vqa_pipeline --mode demo       # Demo tương tác
