@@ -1,0 +1,30 @@
+% =============================================================================
+% Architecture Figure (includable version)
+% Usage:  \input{architecture_figure.tex}
+% Place inside your paper .tex file — requires tikz + xcolor already loaded
+% Packages needed in preamble:
+%   \usepackage{tikz}
+%   \usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,
+%                    fit,backgrounds,decorations.pathreplacing,patterns}
+% =============================================================================
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{%
+\input{architecture_diagram_body.tex}%
+}
+\caption{%
+  Architecture of the proposed Generative VQA model with Mixture-of-Experts (MOE) fusion.
+  Frozen CLIP ViT-B/32 and PhoBERT-base encode the image and Vietnamese question, respectively.
+  Their projected embeddings are concatenated and processed through two pre-norm transformer layers,
+  then routed via a Noisy Top-2 gating mechanism to $K{=}4$ heterogeneous specialised experts
+  (Vision, Text, Multimodal, Specialized).
+  Only $k{=}2$ experts are activated per token (50\% sparsity),
+  maintaining computational efficiency while enabling adaptive multi-modal reasoning.
+  The weighted expert outputs are decoded by a 6-layer autoregressive transformer with weight-tied embeddings.
+  Dashed blue arrows denote sparse dispatch; dashed red arrows denote auxiliary loss paths.
+  Gradients flow through the fusion, MOE, and decoder modules (dotted green);
+  backbone encoders remain frozen.%
+}
+\label{fig:architecture}
+\end{figure*}

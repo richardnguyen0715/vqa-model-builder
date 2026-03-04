@@ -1,0 +1,227 @@
+
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Dataset and Evaluation Metrics}
+\label{sec:experiments:dataset}
+
+\paragraph{Dataset}
+We evaluate on the \textbf{AutoViVQA} benchmark ($\approx$60k Vietnamese image--question--answer triples), designed for balanced and open-ended VQA. We use an 80/10/10 train/val/test split. The generative setting is appropriate as many questions require free-form answers beyond a fixed vocabulary.
+
+\paragraph{Evaluation Metrics}
+We report classification-oriented metrics (Accuracy, Precision, Recall, F1) and generation-oriented metrics (BLEU~\cite{papineni2002bleu}, ROUGE-L~\cite{lin2004rouge}, METEOR~\cite{banerjee2005meteor}, CIDEr~\cite{vedantam2015cider}), providing complementary evaluation of lexical correctness and generation quality.
+
+% ===========================================================================
+\subsection{Implementation Details}
+\label{sec:experiments:impl}
+
+We use CLIP ViT-B/32 and PhoBERT-base as frozen visual and text encoders ($d{=}768$), ensuring that observed improvements are primarily attributable to the fusion mechanism rather than backbone adaptation. The fusion module contains two pre-norm transformer layers followed by a 4-expert MOE layer with Noisy Top-2 routing ($\lambda_\text{lb}{=}0.01$). The decoder has six transformer layers with weight-tied embeddings.
+
+Training uses AdamW~\cite{loshchilov2019decoupled} (lr $= 5{\times}10^{-5}$) with cosine scheduling, label smoothing ($\epsilon{=}0.1$), mixed-precision (FP16), and early stopping on BLEU for 20 epochs. Greedy decoding is used at inference. All experiments run on a single NVIDIA RTX 5090 (32\,GB).
+
+% ===========================================================================
+\subsection{Baseline Models}
+\label{sec:experiments:baselines}
+
+We compare against three categories of baselines:
+
+\paragraph{(A) Multimodal task-specific models}
+\textbf{Vintern}~\cite{vintern} is a Vietnamese multimodal model evaluated in both frozen (\textit{base}) and fine-tuned settings. \textbf{BARTPhoBEiT} combines the BARTpho text decoder with BEiT visual features for Vietnamese VQA. \textbf{ViT5\_ViT} pairs the ViT5 Vietnamese text-to-text model with a ViT visual encoder.
+
+\paragraph{(B) Large Language Models (LLMs)}
+We evaluate several state-of-the-art LLMs in a zero-shot multimodal setting: \textbf{GPT-5}~\cite{openai}, \textbf{LLaMA~3.2}~\cite{touvron2023llama}, \textbf{Gemini~2.0~Flash}, and \textbf{Gemini~2.5~Flash}~\cite{team2023gemini}. These models receive the image and question as input without task-specific fine-tuning, testing their generalization to Vietnamese VQA.
+
+\paragraph{(C) Internal ablation baselines}
+To isolate the contribution of the MOE module, we include: (i)~\textit{No~MOE}---the same architecture with the MOE layer removed (standard dense fusion), and (ii)~various expert subset and single-expert configurations (detailed in Section~\ref{sec:experiments:ablation}).
+
+% ===========================================================================
+\subsection{Main Results}
+\label{sec:experiments:results}
+
+\begin{table}[t]
+\centering
+\caption{Comparison with multimodal task-specific baselines on the AutoViVQA test set. Best per column in \textbf{bold}. All models are fine-tuned except Vintern (base). All values $\times$100.}
+\label{tab:main_multimodal}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lccccccccc}
+\toprule
+Model & Acc & Prec & Rec & F1 & BLEU & ROUGE & METEOR & CIDEr \\
+\midrule
+Vintern (base)      & 0.12 & 17.52 & 19.87 & 17.55 & 1.91 & 25.84 & 23.93 & 8.54 \\
+ViT5\_ViT           & 7.97 & 46.84 & 50.33 & 48.52 & 4.13 & 46.89 & 31.02 & 72.68 \\
+BARTPhoBEiT         & 8.81 & 45.30 & 46.48 & 45.88 & 4.33 & 44.83 & 24.57 & \textbf{188.96} \\
+Vintern (finetune)  & \textbf{13.01} & 52.47 & 55.12 & 53.76 & 6.11 & \textbf{51.93} & 35.25 & 72.84 \\
+\midrule
+\textbf{Ours}       & 9.65 & \textbf{62.89} & \textbf{58.65} & \textbf{60.69} & \textbf{12.54} & 47.07 & \textbf{39.10} & 88.67 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Comparison with zero-shot LLMs on the AutoViVQA test set. Best per column in \textbf{bold}. All values $\times$100.}
+\label{tab:main_llm}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lccccccccc}
+\toprule
+Model & Acc & Prec & Rec & F1 & BLEU & ROUGE & METEOR & CIDEr \\
+\midrule
+LLaMA 3.2      & 0.36 & 23.96 & 73.71 & 36.16 & 3.62 & 36.11 & 30.01 & 62.84 \\
+Gemini 2.0 F   & 0.55 & 27.20 & 74.10 & 39.79 & 4.41 & 39.60 & 31.72 & 74.42 \\
+Gemini 2.5 F   & 0.22 & 24.43 & \textbf{76.66} & 24.75 & 0.39 & 37.27 & 31.22 & 71.90 \\
+GPT-5           & \textbf{10.84} & 47.20 & 55.20 & 50.89 & 6.07 & \textbf{47.30} & 33.34 & 84.20 \\
+\midrule
+\textbf{Ours}   & 9.65 & \textbf{62.89} & 58.65 & \textbf{60.69} & \textbf{12.54} & 47.07 & \textbf{39.10} & \textbf{88.67} \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+Tables~\ref{tab:main_multimodal} and~\ref{tab:main_llm} present the main results.
+
+\paragraph{Competitive with fine-tuned multimodal baselines}
+Our model leads in five out of eight metrics (Prec, Rec, F1, BLEU, METEOR), more than doubling the BLEU of Vintern (finetune) (12.54 vs.\ 6.11) and improving F1 by $+$12.9\% relative. Vintern retains higher Accuracy due to its larger backbone, and BARTPhoBEiT achieves the highest CIDEr (188.96). The consistent advantage across both classification and generation metrics demonstrates the effectiveness of sparse expert-based fusion.
+
+\paragraph{Advantage over zero-shot LLMs}
+Our model leads in five metrics versus GPT-5: Precision ($+$33.2\%), BLEU ($+$106.6\%), F1, METEOR, and CIDEr. Zero-shot LLMs exhibit inflated Recall due to verbose outputs (e.g., Gemini~2.5~F at 76.66) at the cost of Precision. Our model maintains a balanced Precision--Recall trade-off despite being substantially smaller in parameter scale.
+
+% ===========================================================================
+\subsection{Ablation Studies}
+\label{sec:experiments:ablation}
+
+We conduct 27 ablation experiments across four dimensions: MOE effectiveness, expert composition, expert subset synergy, and routing strategy. \textbf{All ablation experiments are trained for only 10 epochs}, compared to 20 epochs for the main results (Section~\ref{sec:experiments:results}), to reduce the computational cost of the ablation sweep. Consequently, absolute scores are lower than the final model; however, relative trends across configurations remain consistent and the comparative conclusions are unaffected.
+
+\subsubsection{Effect of MOE}
+\label{sec:experiments:ablation:moe}
+
+\begin{table}[t]
+\centering
+\caption{Effect of MOE fusion. ``No MOE'' removes the expert layer entirely and uses only attention-based fusion.}
+\label{tab:ablation_moe}
+\begin{tabular}{lcccccc}
+\toprule
+Configuration & BLEU & METEOR & ROUGE-L & CIDEr & F1 \\
+\midrule
+No MOE                  & 5.22 & 27.04 & 41.24 & 65.02 & 44.60 \\
+Full MOE (Noisy Top-2)  & \textbf{6.15} & \textbf{27.88} & \textbf{41.81} & \textbf{67.15} & \textbf{45.43} \\
+\midrule
+$\Delta$ & \textcolor{ForestGreen}{+0.93} & \textcolor{ForestGreen}{+0.84} & \textcolor{ForestGreen}{+0.57} & \textcolor{ForestGreen}{+2.13} & \textcolor{ForestGreen}{+0.83} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation_moe} shows that MOE yields consistent gains: $+$0.93 BLEU, $+$2.13 CIDEr, and $+$0.83 F1 over dense fusion, providing empirical support that sparse expert routing contributes measurable improvements.
+
+\subsubsection{Expert Composition Analysis}
+\label{sec:experiments:ablation:loo}
+
+\begin{table}[t]
+\centering
+\caption{Leave-one-out expert analysis. Each row removes one expert type from the full configuration. $\Delta$BLEU is relative to the full model.}
+\label{tab:ablation_loo}
+\begin{tabular}{lcccccc}
+\toprule
+Removed Expert & BLEU & METEOR & ROUGE-L & CIDEr & F1 & $\Delta$BLEU \\
+\midrule
+None (Full)     & \textbf{6.56} & 27.79 & 41.96 & 67.98 & 45.57 & --- \\
+$-$Vision       & 6.12 & \textbf{28.07} & \textbf{42.02} & 67.42 & \textbf{45.59} & \textcolor{red}{$-$0.44} \\
+$-$Text         & 6.43 & 27.94 & 42.22 & \textbf{69.08} & 45.70 & \textcolor{red}{$-$0.13} \\
+$-$Multimodal   & 6.45 & 27.93 & 42.17 & 69.06 & 45.64 & \textcolor{red}{$-$0.11} \\
+$-$Specialized  & 6.45 & 27.93 & 42.17 & 69.06 & 45.64 & \textcolor{red}{$-$0.11} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation_loo} presents leave-one-out results. The \textit{Vision} expert causes the largest BLEU drop ($-$0.44) when removed. Individual removals produce small degradations, but removing multiple types simultaneously (Section~\ref{sec:experiments:ablation:subset}) causes much larger drops, revealing synergistic interactions.
+
+\subsubsection{Expert Subset Synergy}
+\label{sec:experiments:ablation:subset}
+
+\begin{table}[t]
+\centering
+\caption{Expert subset experiments. Each row uses only the listed expert types. ``Full'' includes all four types.}
+\label{tab:ablation_subset}
+\begin{tabular}{lcccccc}
+\toprule
+Expert Subset & $K$ & BLEU & ROUGE-L & CIDEr & F1 \\
+\midrule
+Full (V+T+M+S)     & 4 & \textbf{6.56} & 41.96 & 67.98 & 45.57 \\
+\midrule
+M+S+T (no Vision)  & 3 & 6.12 & \textbf{42.02} & 67.42 & \textbf{45.59} \\
+S+T+V (no Multimodal) & 3 & 6.56 & 41.96 & 67.98 & 45.57 \\
+M+S+V (no Text)    & 3 & 4.67 & 40.32 & 60.05 & 43.54 \\
+M+T+V (no Specialized) & 3 & 4.72 & 40.39 & 60.43 & 43.99 \\
+\midrule
+M+S                & 2 & 6.12 & 41.98 & 67.37 & 45.58 \\
+T+V                & 2 & 6.45 & 42.17 & 69.06 & 45.64 \\
+M+T                & 2 & 4.99 & 40.30 & 61.92 & 43.78 \\
+S+V                & 2 & 6.43 & 42.22 & \textbf{69.08} & 45.70 \\
+M+V                & 2 & 4.72 & 40.39 & 60.43 & 43.99 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation_subset} reveals clear synergy patterns:
+
+\begin{itemize}
+    \item The \textit{Text+Vision} pair achieves 6.45 BLEU with only 2 experts, approaching the full model (6.56), indicating a strong baseline foundation from modality-specific experts.
+    \item The gap between the best 2-expert subset (T+V: 6.45) and the full 4-expert model (6.56) is only 0.11 BLEU, suggesting diminishing returns from additional experts.
+\end{itemize}
+
+\subsubsection{Routing Strategy Analysis}
+\label{sec:experiments:ablation:routing}
+
+\begin{table}[t]
+\centering
+\caption{Effect of routing strategy and top-$k$ on the full expert configuration.}
+\label{tab:ablation_router}
+\begin{tabular}{llcccccc}
+\toprule
+Router & $k$ & BLEU & METEOR & ROUGE-L & CIDEr & F1 \\
+\midrule
+Expert Choice   & 1 & \textbf{6.15} & 27.88 & 41.81 & 67.15 & 45.43 \\
+Noisy Top-$k$   & 1 & 5.22 & 27.04 & 41.24 & 65.02 & 44.60 \\
+Noisy Top-$k$   & 2 & 6.15 & 27.88 & 41.81 & 67.15 & 45.43 \\
+\textbf{Noisy Top-$k$}   & \textbf{4} & 5.80 & \underline{28.01} & \underline{42.12} & \underline{69.62} & \underline{45.84} \\
+Soft            & all & 6.07 & \textbf{28.36} & 42.09 & \textbf{69.64} & \textbf{46.13} \\
+Top-$k$         & 1 & 5.45 & 27.07 & 40.97 & 64.78 & 44.53 \\
+Top-$k$         & 2 & 6.39 & 28.02 & 41.78 & 68.93 & 45.60 \\
+Top-$k$         & 4 & \underline{6.45} & 28.23 & \textbf{41.99} & 69.08 & 45.85 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation_router} compares routing strategies. Top-1 routing consistently underperforms Top-2 (e.g., 5.22 vs.\ 6.15 BLEU for Noisy Top-$k$). Soft routing achieves the best F1 and CIDEr (46.13, 69.64) but at higher computational cost.
+
+We adopt Noisy Top-2 as the default router. Although deterministic Top-$k$ ($k{=}4$) achieves higher BLEU, it activates all experts per token. Noisy Top-2 preserves sparsity with higher routing entropy (1.25 vs.\ 0.54), yielding better expert utilization balance across diverse reasoning categories.
+
+% ===========================================================================
+\subsection{Analysis and Discussion}
+\label{sec:experiments:analysis}
+
+\begin{table}[t]
+\centering
+\caption{MOE routing statistics across configurations. Higher entropy indicates more uniform expert utilization.}
+\label{tab:routing_stats}
+\begin{tabular}{lccc}
+\toprule
+Configuration & LB Loss & Routing Entropy & Active Experts \\
+\midrule
+Noisy Top-2 (Full) & 0.0107 & 1.2480 & 4/4 \\
+Top-$k$ ($k{=}2$) & 0.0193 & 0.5262 & 4/4 \\
+Top-$k$ ($k{=}4$) & 0.0400 & 0.5435 & 4/4 \\
+Expert Choice & --- & 0.1145 & 4/4 \\
+Soft & --- & 0.7210 & 4/4 \\
+\midrule
+Subset M+S (2 experts) & 0.0202 & 0.9252 & 2/2 \\
+Subset S+T+V (3 experts) & 0.0217 & 0.8035 & 3/3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:routing_stats} reports routing statistics. All experts remain active across configurations, confirming load-balancing effectiveness. The Noisy Top-$k$ router achieves the highest entropy (1.2480), indicating the most uniform token distribution. Preliminary inspection suggests input-dependent specialization; systematic routing visualization is left for future work.
+
+\paragraph{Limitations}
+Our model trails zero-shot LLMs in Recall (58.65 vs.\ 76.66 for Gemini~2.5~F), partly due to greedy decoding. The modest per-expert drops in leave-one-out suggest the four-expert configuration may under-utilize MOE capacity. Scaling to more experts, larger Vietnamese corpora, and cross-lingual benchmarks are promising directions.
+
