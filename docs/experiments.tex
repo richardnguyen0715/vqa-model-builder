@@ -222,6 +222,61 @@ Subset S+T+V (3 experts) & 0.0217 & 0.8035 & 3/3 \\
 
 Table~\ref{tab:routing_stats} reports routing statistics. All experts remain active across configurations, confirming load-balancing effectiveness. The Noisy Top-$k$ router achieves the highest entropy (1.2480), indicating the most uniform token distribution. Preliminary inspection suggests input-dependent specialization; systematic routing visualization is left for future work.
 
+\paragraph{Qualitative Examples}
+Figure~\ref{fig:qualitative} presents four representative predictions from the AutoViVQA test set, covering spatial reasoning, weather description, color recognition, and counting. In all cases, the model produces concise, semantically correct Vietnamese answers that align with the ground-truth references, demonstrating its ability to handle diverse question types.
+
+\begin{figure*}[t]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{cc}
+%% ---- Example 1 ----
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+\includegraphics[width=0.85\linewidth]{figures/qual_ex1.jpg}\\[4pt]
+\small
+\textbf{Q:} Khoai tây chiên được đặt ở vị trí nào so với bánh sandwich?\\
+{\color{gray}\textit{(Where are the fries placed relative to the sandwich?)}}\\[2pt]
+\textbf{GT:} Bên cạnh bánh sandwich~/~Cạnh bánh mì kẹp~/~\ldots\\
+\textbf{Pred:} \colorbox{green!15}{\strut Bên cạnh bánh sandwich}~~{\color{green!60!black}\cmark}
+\end{minipage}
+&
+%% ---- Example 2 ----
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+\includegraphics[width=0.85\linewidth]{figures/qual_ex2.jpg}\\[4pt]
+\small
+\textbf{Q:} Thời tiết hôm đó như thế nào khi máy bay được tiếp nhiên liệu?\\
+{\color{gray}\textit{(What was the weather like when the plane was being refueled?)}}\\[2pt]
+\textbf{GT:} Trời nhiều mây~/~Ngày u ám~/~Có mây~/~\ldots\\
+\textbf{Pred:} \colorbox{green!15}{\strut Có nhiều mây}~~{\color{green!60!black}\cmark}
+\end{minipage}
+\\[12pt]
+%% ---- Example 3 ----
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+\includegraphics[width=0.85\linewidth]{figures/qual_ex3.jpg}\\[4pt]
+\small
+\textbf{Q:} Màu sắc chủ đạo của bức tường trong phòng là gì?\\
+{\color{gray}\textit{(What is the dominant color of the room's wall?)}}\\[2pt]
+\textbf{GT:} Màu mòng két~/~Màu xanh mòng két~/~Màu xanh~/~\ldots\\
+\textbf{Pred:} \colorbox{yellow!20}{\strut Màu xanh}~~{\color{orange}\textbf{$\sim$}}
+\end{minipage}
+&
+%% ---- Example 4 ----
+\begin{minipage}[t]{0.47\textwidth}
+\centering
+\includegraphics[width=0.85\linewidth]{figures/qual_ex4.jpg}\\[4pt]
+\small
+\textbf{Q:} Có bao nhiêu chiếc ô có thể nhìn thấy trên bãi biển?\\
+{\color{gray}\textit{(How many umbrellas can be seen on the beach?)}}\\[2pt]
+\textbf{GT:} Hai chiếc ô~/~Hai ô~/~Có hai chiếc ô~/~\ldots\\
+\textbf{Pred:} \colorbox{yellow!20}{\strut Hai chiếc}~~{\color{orange}\textbf{$\sim$}}
+\end{minipage}
+\end{tabular}
+\caption{Qualitative examples from the AutoViVQA test set. \textbf{Q}: question, \textbf{GT}: ground-truth references (multiple accepted answers), \textbf{Pred}: model prediction. {\color{green!60!black}\cmark}~denotes an exact match with a reference; {\color{orange}\textbf{$\sim$}}~denotes a semantically correct but partially matching answer. Examples 1--2 show exact matches for spatial and weather reasoning. Example~3 predicts ``Màu xanh'' (blue/green), which is acceptable but less specific than ``Màu mòng két'' (teal). Example~4 correctly identifies the count but omits the object noun ``ô'' (umbrella).}
+\label{fig:qualitative}
+\end{figure*}
+
 \paragraph{Limitations}
 Our model trails zero-shot LLMs in Recall (58.65 vs.\ 76.66 for Gemini~2.5~F), partly due to greedy decoding. The modest per-expert drops in leave-one-out suggest the four-expert configuration may under-utilize MOE capacity. Scaling to more experts, larger Vietnamese corpora, and cross-lingual benchmarks are promising directions.
-

@@ -1,5 +1,5 @@
 % =============================================================================
-% Architecture Diagram Body (no preamble — for \input inside a figure)
+% Architecture Diagram Body  (no preamble — for \input inside a figure)
 % Requires in main document preamble:
 %   \usepackage{tikz,amsmath,amssymb,xcolor}
 %   \usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,
@@ -33,20 +33,20 @@
 
 % ── Styles ───────────────────────────────────────────────────────────────────
 \tikzset{
-  blk/.style={draw,rounded corners=3pt,minimum height=0.85cm,
-              font=\small\sffamily,align=center,thick,inner sep=5pt},
-  inblk/.style ={blk,fill=inputBg,draw=inputBlue,minimum width=3cm},
-  vblk/.style  ={blk,fill=visBg,draw=visBlue,minimum width=3.4cm},
-  tblk/.style  ={blk,fill=txtBg,draw=txtGreen,minimum width=3.4cm},
-  rblk/.style  ={blk,fill=routerBg,draw=routerOrange,minimum width=4.5cm},
+  blk/.style={draw,rounded corners=3pt,minimum height=0.95cm,
+              font=\small\sffamily,align=center,thick,inner sep=6pt},
+  inblk/.style ={blk,fill=inputBg,draw=inputBlue,minimum width=3.2cm},
+  vblk/.style  ={blk,fill=visBg,draw=visBlue,minimum width=3.6cm},
+  tblk/.style  ={blk,fill=txtBg,draw=txtGreen,minimum width=3.6cm},
+  rblk/.style  ={blk,fill=routerBg,draw=routerOrange,minimum width=5.0cm},
   eblk/.style  ={blk,fill=expBg,draw=expPurple,
-                  minimum width=2.1cm,minimum height=1.05cm,
+                  minimum width=2.4cm,minimum height=1.15cm,
                   font=\footnotesize\sffamily},
-  dblk/.style  ={blk,fill=decBg,draw=decPurple,minimum width=5.5cm},
-  oblk/.style  ={blk,fill=outBg,draw=outGray,minimum width=3.5cm},
-  op/.style     ={draw,rounded corners=2pt,minimum height=0.50cm,
+  dblk/.style  ={blk,fill=decBg,draw=decPurple,minimum width=6.0cm},
+  oblk/.style  ={blk,fill=outBg,draw=outGray,minimum width=3.8cm},
+  op/.style     ={draw,rounded corners=2pt,minimum height=0.55cm,
                   font=\scriptsize\sffamily,align=center,thin,
-                  inner sep=3pt,fill=white},
+                  inner sep=4pt,fill=white},
   dim/.style    ={font=\scriptsize\ttfamily,text=dimGray},
   frozen/.style ={font=\tiny\sffamily\itshape,text=frozenGray},
   stg/.style    ={font=\footnotesize\sffamily\bfseries,text=dimGray},
@@ -58,46 +58,67 @@
                   densely dotted},
 }
 
-\begin{tikzpicture}[node distance=0.55cm and 1cm]
+\begin{tikzpicture}[node distance=0.8cm and 1.5cm]
 
-% ═══════════════════  INPUTS  ════════════════════════════════════════════════
-\node[stg] at (-6.8,0) {\rotatebox{90}{INPUT}};
+% ═══════════════════════════════════════════════════════════════════════════════
+%  Y-COORDINATE MAP (generous spacing)
+%
+%   0.0   Inputs
+%  -1.8   Patch / Token Embedding
+%  -3.4   Transformer Encoder backbones
+%  -5.0   Linear projections
+%  -6.8   Concatenation
+%  -8.8   Pre-Norm Transformer (fusion)
+% -10.8   Noisy Top-2 Router
+% -13.2   Expert blocks
+% -15.4   Weighted Aggregation
+% -17.6   Decoder
+% -19.4   Output Projection
+% -20.4   Softmax
+% -21.6   Answer
+% ═══════════════════════════════════════════════════════════════════════════════
 
-\node[inblk] (imgIn) at (-2.8,0) {\textbf{Image}~$I$};
-\node[dim,below=1pt of imgIn] {$224{\times}224{\times}3$};
 
-\node[inblk] (qIn) at (2.8,0) {\textbf{Question}~$Q$};
-\node[dim,below=1pt of qIn] {$L$ tokens (Vietnamese)};
+% ═══════════════════  STAGE 1 — INPUTS  ══════════════════════════════════════
+\node[stg] at (-8.0,0) {\rotatebox{90}{INPUT}};
 
-% ═══════════════════  ENCODERS  ══════════════════════════════════════════════
-\node[stg] at (-6.8,-2.5) {\rotatebox{90}{ENCODERS}};
+\node[inblk] (imgIn) at (-3.2,0) {\textbf{Image}~$I$};
+\node[dim,below=4pt of imgIn] {$224{\times}224{\times}3$};
 
-% Visual
-\node[vblk] (patchEmb) at (-2.8,-1.3)
+\node[inblk] (qIn) at (3.2,0) {\textbf{Question}~$Q$};
+\node[dim,below=4pt of qIn] {$L$ tokens (Vietnamese)};
+
+
+% ═══════════════════  STAGE 2/3 — ENCODERS  ═════════════════════════════════
+\node[stg] at (-8.0,-3.4) {\rotatebox{90}{ENCODERS}};
+
+% --- Visual column (left) ---
+\node[vblk] (patchEmb) at (-3.2,-1.8)
   {Patch Embedding\\[-2pt]{\scriptsize $32{\times}32$ patches + \texttt{[CLS]}}};
-\node[dim,right=2pt of patchEmb] {$50{\times}d_v$};
+\node[dim,right=8pt of patchEmb] {$50{\times}d_v$};
 
-\node[vblk] (vitEnc) at (-2.8,-2.5)
+\node[vblk] (vitEnc) at (-3.2,-3.4)
   {\textbf{CLIP ViT-B/32}\\[-2pt]{\scriptsize Transformer Encoder}};
-\node[frozen,right=2pt of vitEnc] {\textit{frozen}};
+\node[frozen,right=8pt of vitEnc] {\textit{frozen}};
 
-\node[op,draw=visBlue,fill=visBg!40] (visProj) at (-2.8,-3.6)
+\node[op,draw=visBlue,fill=visBg!40] (visProj) at (-3.2,-5.0)
   {Linear~$W_v$};
-\node[dim,right=2pt of visProj] {$50{\times}D$};
+\node[dim,right=8pt of visProj] {$50{\times}D$};
 
-% Text
-\node[tblk] (tokEmb) at (2.8,-1.3)
+% --- Text column (right) ---
+\node[tblk] (tokEmb) at (3.2,-1.8)
   {Token Embedding\\[-2pt]{\scriptsize + Position Encoding}};
-\node[dim,left=2pt of tokEmb] {$L{\times}d_t$};
+\node[dim,left=8pt of tokEmb] {$L{\times}d_t$};
 
-\node[tblk] (phoBERT) at (2.8,-2.5)
+\node[tblk] (phoBERT) at (3.2,-3.4)
   {\textbf{PhoBERT-base}\\[-2pt]{\scriptsize Transformer Encoder}};
-\node[frozen,left=2pt of phoBERT] {\textit{frozen}};
+\node[frozen,left=8pt of phoBERT] {\textit{frozen}};
 
-\node[op,draw=txtGreen,fill=txtBg!40] (txtProj) at (2.8,-3.6)
+\node[op,draw=txtGreen,fill=txtBg!40] (txtProj) at (3.2,-5.0)
   {Linear~$W_t$};
-\node[dim,left=2pt of txtProj] {$L{\times}D$};
+\node[dim,left=8pt of txtProj] {$L{\times}D$};
 
+% Encoder arrows
 \draw[arr] (imgIn)    -- (patchEmb);
 \draw[arr] (patchEmb) -- (vitEnc);
 \draw[arr] (vitEnc)   -- (visProj);
@@ -105,123 +126,130 @@
 \draw[arr] (tokEmb)   -- (phoBERT);
 \draw[arr] (phoBERT)  -- (txtProj);
 
+
 % ═══════════════════  CONCATENATION  ═════════════════════════════════════════
-\node[op,minimum width=4.8cm,draw=arrGray] (concat) at (0,-4.8)
+\node[op,minimum width=5.2cm,draw=arrGray] (concat) at (0,-6.8)
   {Concatenation~$[\hat{V};\;\hat{T}]$};
-\node[dim,below=1pt of concat] (concatDim) {$(N_v{+}L){\times}D$};
+\node[dim,below=4pt of concat] (concatDim) {$(N_v{+}L){\times}D$};
 
-\draw[arr] (visProj.south) -- ++(0,-0.35) -| ([xshift=-1cm]concat.north);
-\draw[arr] (txtProj.south) -- ++(0,-0.35) -| ([xshift= 1cm]concat.north);
+\draw[arr] (visProj.south) -- ++(0,-0.5) -| ([xshift=-1.2cm]concat.north);
+\draw[arr] (txtProj.south) -- ++(0,-0.5) -| ([xshift= 1.2cm]concat.north);
 
-% ═══════════════════  FUSION WITH MOE  ═══════════════════════════════════════
-\node[stg] at (-6.8,-8.0) {\rotatebox{90}{FUSION~(MOE)}};
 
-\node[blk,fill=moeBg!60,draw=moeRed!70,minimum width=5.5cm]
-  (preAttn) at (0,-6.0)
+% ═══════════════════  STAGE 4 — FUSION WITH MOE  ════════════════════════════
+\node[stg] at (-8.0,-12.0) {\rotatebox{90}{FUSION~(MOE)}};
+
+% (a) Pre-norm Transformer attention
+\node[blk,fill=moeBg!60,draw=moeRed!70,minimum width=6.0cm]
+  (preAttn) at (0,-8.8)
   {\textbf{Pre-Norm Transformer}~${\times}\,L_f{=}2$\\[-2pt]
-   {\scriptsize MHSA~($H{=}8$) + FFN~($d_{\mathrm{ff}}{=}2048$) + LN}};
-\node[dim,right=2pt of preAttn] {$(N_v{+}L){\times}D$};
+   {\scriptsize MHSA~($H{=}8$)\;+\;FFN~($d_{\mathrm{ff}}{=}2048$)\;+\;LN}};
+\node[dim,right=10pt of preAttn] {$(N_v{+}L){\times}D$};
 
-\node[rblk] (router) at (0,-7.4)
+% (b) Noisy Top-k Router
+\node[rblk] (router) at (0,-10.8)
   {\textbf{Noisy Top-2 Router}\\[-2pt]
    {\scriptsize $\tilde{\ell}=W_r^\top x
-     +\mathrm{Softplus}(W_n^\top x)\!\cdot\!\epsilon$\,,\;
+     +\mathrm{Softplus}(W_n^\top x)\!\cdot\!\epsilon$\;,\;\;
      $\epsilon{\sim}\mathcal{N}(0,\sigma^2 I)$}\\[-2pt]
-   {\scriptsize Softmax~$\rightarrow$~Top-2 selection per token}};
-\node[dim,right=2pt of router,text=sparseBlue]
-  {\textit{sparse:~$k{=}2$ of $K{=}4$}};
+   {\scriptsize Softmax\;$\rightarrow$\;Top-2 selection per token}};
+\node[dim,right=10pt of router,text=sparseBlue]
+  {\textit{sparse:\;$k{=}2$ of $K{=}4$}};
 
-% Experts
-\node[eblk] (eVis)  at (-3.75,-9.1)
+% (c) Specialised Experts — wider horizontal spread
+\node[eblk] (eVis)  at (-4.5,-13.2)
   {$E_{\mathrm{vis}}$\\[-1pt]\textbf{Vision}\\[-2pt]
    {\tiny Spatial MHSA}\\[-2pt]{\tiny + FFN}};
-\node[eblk] (eTxt)  at (-1.25,-9.1)
+\node[eblk] (eTxt)  at (-1.5,-13.2)
   {$E_{\mathrm{txt}}$\\[-1pt]\textbf{Text}\\[-2pt]
    {\tiny Context MHSA}\\[-2pt]{\tiny + Masked FFN}};
-\node[eblk] (eMM)   at ( 1.25,-9.1)
+\node[eblk] (eMM)   at ( 1.5,-13.2)
   {$E_{\mathrm{mm}}$\\[-1pt]\textbf{Multimodal}\\[-2pt]
    {\tiny Cross-Attn}\\[-2pt]{\tiny + Gate~$\gamma$}};
-\node[eblk] (eSpec) at ( 3.75,-9.1)
+\node[eblk] (eSpec) at ( 4.5,-13.2)
   {$E_{\mathrm{spec}}$\\[-1pt]\textbf{Specialized}\\[-2pt]
    {\tiny Seg\,/\,Det\,/}\\[-2pt]{\tiny OCR\,/\,Scene}};
 
-% Aggregation
-\node[op,minimum width=6cm,draw=moeRed!70,fill=moeBg!50]
-  (agg) at (0,-10.7)
-  {Weighted Aggregation~+~LayerNorm};
-\node[dim,below=1pt of agg] (aggDim)
-  {$y=\mathrm{LN}\!\bigl(\sum_{i\in\mathrm{Top\text{-}2}}
-    g_i\cdot E_i(x)\bigr)$\qquad
-   $(N_v{+}L){\times}D$};
+% (d) Weighted aggregation
+\node[op,minimum width=7.0cm,draw=moeRed!70,fill=moeBg!50]
+  (agg) at (0,-15.4)
+  {Weighted Aggregation\;+\;LayerNorm};
 
-% Load-balance loss
-\node[blk,fill=white,draw=lossRed,minimum width=2.4cm,
-      font=\scriptsize\sffamily] (lbLoss) at (6.2,-7.4)
+
+% Load-balance loss (side branch — pushed further right)
+\node[blk,fill=white,draw=lossRed,minimum width=2.6cm,
+      font=\scriptsize\sffamily] (lbLoss) at (8.0,-10.8)
   {$\mathcal{L}_{\mathrm{lb}}
-     =K\!\displaystyle\sum f_i\bar{p}_i$\\[-2pt]
+     =K\!\displaystyle\sum f_i\bar{p}_i$\\[0pt]
    {\tiny $\lambda_{\mathrm{lb}}{=}0.01$}};
-\node[dim,above=1pt of lbLoss,text=lossRed]
+\node[dim,above=5pt of lbLoss,text=lossRed]
   {\textit{Load-Balance Loss}};
 
-% MOE frame
+% ── MOE highlighted background frame ────────────────────────────────────────
 \begin{scope}[on background layer]
   \node[draw=moeBorder,fill=moeBg!20,rounded corners=6pt,
-        very thick,inner sep=10pt,
-        fit=(preAttn)(router)(eVis)(eSpec)(agg)(aggDim)(lbLoss)]
+        very thick,inner sep=14pt,
+        fit=(preAttn)(router)(eVis)(eSpec)(agg)(lbLoss)]
     (moeFrame) {};
   \node[font=\small\sffamily\bfseries,text=moeRed,
         anchor=north west]
-    at ([xshift=4pt,yshift=-2pt]moeFrame.north west)
+    at ([xshift=6pt,yshift=-1pt]moeFrame.north west)
     {Cross-Modal Fusion with Mixture-of-Experts};
 \end{scope}
 
-% Arrows
-\draw[arr] (concat)  -- (preAttn);
+% ── Arrows inside MOE ───────────────────────────────────────────────────────
+\draw[arr] (concat) -- (preAttn);
 \draw[arr] (preAttn) -- (router);
 
-\draw[sparr] (router.south) -- ++(0,-0.30) -| (eVis.north);
-\draw[sparr] (router.south) -- ++(0,-0.30) -| (eTxt.north);
-\draw[sparr] (router.south) -- ++(0,-0.30) -| (eMM.north);
-\draw[sparr] (router.south) -- ++(0,-0.30) -| (eSpec.north);
+% Router → experts  (sparse dashed blue)
+\draw[sparr] (router.south) -- ++(0,-0.5) -| (eVis.north);
+\draw[sparr] (router.south) -- ++(0,-0.5) -| (eTxt.north);
+\draw[sparr] (router.south) -- ++(0,-0.5) -| (eMM.north);
+\draw[sparr] (router.south) -- ++(0,-0.5) -| (eSpec.north);
 
-\draw[arr] (eVis.south)  -- ++(0,-0.30) -| ([xshift=-1.8cm]agg.north);
-\draw[arr] (eTxt.south)  -- ++(0,-0.35) -| ([xshift=-0.6cm]agg.north);
-\draw[arr] (eMM.south)   -- ++(0,-0.35) -| ([xshift= 0.6cm]agg.north);
-\draw[arr] (eSpec.south) -- ++(0,-0.30) -| ([xshift= 1.8cm]agg.north);
+% Experts → aggregation
+\draw[arr] (eVis.south)  -- ++(0,-0.45) -| ([xshift=-2.1cm]agg.north);
+\draw[arr] (eTxt.south)  -- ++(0,-0.50) -| ([xshift=-0.7cm]agg.north);
+\draw[arr] (eMM.south)   -- ++(0,-0.50) -| ([xshift= 0.7cm]agg.north);
+\draw[arr] (eSpec.south) -- ++(0,-0.45) -| ([xshift= 2.1cm]agg.north);
 
+% Router → load-balance loss
 \draw[auxarr] (router.east) -- (lbLoss.west);
 
-% ═══════════════════  DECODER  ═══════════════════════════════════════════════
-\node[stg] at (-6.8,-12.2) {\rotatebox{90}{DECODER}};
 
-\node[dblk] (decoder) at (0,-12.2)
+% ═══════════════════  STAGE 5 — DECODER  ════════════════════════════════════
+\node[stg] at (-8.0,-18) {\rotatebox{90}{DECODER}};
+
+\node[dblk] (decoder) at (0,-18)
   {\textbf{Autoregressive Transformer Decoder}~${\times}\,L_d{=}6$\\[-2pt]
-   {\scriptsize Causal Self-Attn~$\to$~Cross-Attn~$\to$~FFN}\\[-2pt]
-   {\scriptsize $H_d{=}8$ heads,\; $d_{\mathrm{ff}}{=}2048$,\; Pre-Norm}};
-\node[dim,right=2pt of decoder]
-  {\parbox{2.2cm}{\centering\scriptsize encoder memory\\
+   {\scriptsize Causal Self-Attn\;$\to$\;Cross-Attn\;$\to$\;FFN}\\[-2pt]
+   {\scriptsize $H_d{=}8$ heads,\;\; $d_{\mathrm{ff}}{=}2048$,\;\; Pre-Norm}};
+\node[dim,right=10pt of decoder]
+  {\parbox{2.4cm}{\centering\scriptsize encoder memory\\[1pt]
    $(N_v{+}L){\times}D$}};
 
-\node[op,draw=decPurple,fill=decBg!40,minimum width=1.8cm]
-  (tfEmb) at (-5.0,-12.2)
-  {\parbox{1.6cm}{\centering Embed.~$W_e$\\{\tiny + Pos Enc}\\
+% Teacher-forcing input (left, with more clearance)
+\node[op,draw=decPurple,fill=decBg!40,minimum width=2.0cm]
+  (tfEmb) at (-5.8,-18)
+  {\parbox{1.8cm}{\centering Embed.~$W_e$\\[1pt]{\tiny + Pos Enc}\\[1pt]
    {\tiny (teacher forcing)}}};
 \node[dim,above=1pt of tfEmb] {$a_{<t}$};
 
-\draw[arr] (agg)   -- (decoder);
+\draw[arr] (agg) -- (decoder);
 \draw[arr] (tfEmb) -- (decoder);
 
-% ═══════════════════  OUTPUT  ════════════════════════════════════════════════
-\node[stg] at (-6.8,-14.5) {\rotatebox{90}{OUTPUT}};
 
-\node[op,draw=outGray,minimum width=4.2cm] (outProj) at (0,-13.5)
+% ═══════════════════  STAGE 6 — OUTPUT  ═════════════════════════════════════
+\node[stg] at (-8.0,-20.6) {\rotatebox{90}{OUTPUT}};
+
+\node[op,draw=outGray,minimum width=4.5cm] (outProj) at (0,-19.4)
   {Output Projection~$W_e^\top$\;\;{\scriptsize (weight-tied)}};
-\node[dim,right=2pt of outProj] {$T{\times}|\mathcal{V}|$};
+\node[dim,right=10pt of outProj] {$T{\times}|\mathcal{V}|$};
 
-\node[op,draw=outGray,minimum width=2.5cm] (softmax) at (0,-14.2)
+\node[op,draw=outGray,minimum width=2.8cm] (softmax) at (0,-20.4)
   {Softmax};
 
-\node[oblk] (answer) at (0,-15.1)
+\node[oblk] (answer) at (0,-21.6)
   {\textbf{Generated Answer}\\[-2pt]
    {\scriptsize Open-ended Vietnamese text}};
 
@@ -229,79 +257,84 @@
 \draw[arr] (outProj) -- (softmax);
 \draw[arr] (softmax) -- (answer);
 
-% Training Loss
-\node[blk,fill=white,draw=lossRed,minimum width=3.2cm,
-      font=\scriptsize\sffamily] (totalLoss) at (6.2,-13.0)
+
+% ═══════════════════  TRAINING LOSS  ═════════════════════════════════════════
+\node[blk,fill=white,draw=lossRed,minimum width=3.4cm,
+      font=\scriptsize\sffamily] (totalLoss) at (8.0,-18.0)
   {\textbf{Training Loss}\\[-2pt]
    $\mathcal{L}=\mathcal{L}_{\mathrm{ce}}
      +\lambda\,\mathcal{L}_{\mathrm{lb}}$\\[-2pt]
    {\tiny label smoothing~$\epsilon{=}0.1$}};
 
 \draw[auxarr] (softmax.east) -| (totalLoss.south);
-\draw[auxarr] (lbLoss.south) |- ([yshift=3pt]totalLoss.north);
+\draw[auxarr] (lbLoss.south) |- ([yshift=4pt]totalLoss.north);
 
-% Gradient flow
+
+% ═══════════════════  GRADIENT FLOW  ════════════════════════════════════════
 \draw[gradarr,very thick]
-  ([xshift=3.5cm]answer.east) -- ++(0,13.5)
-  node[midway,right=3pt,font=\scriptsize\sffamily,
+  ([xshift=8.3cm]answer.east) -- ++(0,20.0)
+  node[midway,right=4pt,font=\scriptsize\sffamily,
        text=gradGreen,rotate=90,anchor=south]
   {$\nabla$~Gradient flow (backpropagation)};
 
-% Frozen note
+
+% ═══════════════════  FROZEN BACKBONE NOTE  ═════════════════════════════════
 \node[font=\tiny\sffamily,text=frozenGray,align=center,
-      fill=white,draw=frozenGray,rounded corners=2pt,inner sep=2pt]
-  (frozenNote) at (-5.8,-2.5)
+      fill=white,draw=frozenGray,rounded corners=2pt,inner sep=3pt]
+  (frozenNote) at (-6.2,-3.4)
   {\textsf{\textbf{$\times$}}~Frozen backbones:\\no gradient update};
 
 \draw[frozenGray,thin,densely dotted]
-  (frozenNote.east) -- ++(0.15,0) |- (vitEnc.west);
+  (frozenNote.east) -- ++(0.2,0) |- (vitEnc.west);
 \draw[frozenGray,thin,densely dotted]
-  (frozenNote.east) -- ++(0.15,0) |- (phoBERT.west);
+  (frozenNote.east) -- ++(0.2,0) |- (phoBERT.west);
 
-% ═══════════════════  LEGEND  ════════════════════════════════════════════════
+
+% ═══════════════════  LEGEND (top-right)  ════════════════════════════════════
 \node[anchor=north west,font=\scriptsize\sffamily,text=dimGray,
       align=left,fill=white,draw=dimGray!50,
-      rounded corners=3pt,inner sep=5pt]
-  at (7.8,-0.2)
-  {\textbf{Legend}\\[3pt]
-   \tikz[baseline=-0.5ex]\draw[arr](0,0)--(0.55,0);
-     ~Dense data flow\\[1pt]
-   \tikz[baseline=-0.5ex]\draw[sparr](0,0)--(0.55,0);
-     ~Sparse dispatch\\[1pt]
-   \tikz[baseline=-0.5ex]\draw[auxarr](0,0)--(0.55,0);
-     ~Auxiliary loss\\[1pt]
-   \tikz[baseline=-0.5ex]\draw[gradarr](0,0)--(0.55,0);
-     ~Gradient flow\\[4pt]
-   \tikz\fill[visBg](0,0) rectangle (0.35,0.22);
-     ~Visual pathway\\[1pt]
-   \tikz\fill[txtBg](0,0) rectangle (0.35,0.22);
-     ~Text pathway\\[1pt]
-   \tikz\fill[moeBg](0,0) rectangle (0.35,0.22);
-     ~MOE fusion (core)\\[1pt]
-   \tikz\fill[decBg](0,0) rectangle (0.35,0.22);
+      rounded corners=3pt,inner sep=6pt]
+  at (10.5, 0.5)
+  {\textbf{Legend}\\[4pt]
+   \tikz[baseline=-0.5ex]\draw[arr](0,0)--(0.6,0);
+     ~Dense data flow\\[2pt]
+   \tikz[baseline=-0.5ex]\draw[sparr](0,0)--(0.6,0);
+     ~Sparse dispatch\\[2pt]
+   \tikz[baseline=-0.5ex]\draw[auxarr](0,0)--(0.6,0);
+     ~Auxiliary loss\\[2pt]
+   \tikz[baseline=-0.5ex]\draw[gradarr](0,0)--(0.6,0);
+     ~Gradient flow\\[5pt]
+   \tikz\fill[visBg](0,0) rectangle (0.4,0.25);
+     ~Visual pathway\\[2pt]
+   \tikz\fill[txtBg](0,0) rectangle (0.4,0.25);
+     ~Text pathway\\[2pt]
+   \tikz\fill[moeBg](0,0) rectangle (0.4,0.25);
+     ~MOE fusion (core)\\[2pt]
+   \tikz\fill[decBg](0,0) rectangle (0.4,0.25);
      ~Decoder};
 
-% Computational Properties
+
+% ═══════════════════  COMPUTATIONAL PROPERTIES (right)  ═════════════════════
 \node[anchor=north west,font=\scriptsize\sffamily,text=dimGray,
       align=left,fill=white,draw=dimGray!50,
-      rounded corners=3pt,inner sep=5pt]
-  at (7.8,-4.2)
-  {\textbf{Computational Properties}\\[3pt]
-   \textcolor{sparseBlue}{\rule{7pt}{2pt}}~%
-     Sparse activation: Top-2 of $K{=}4$\\[1pt]
-   \textcolor{sparseBlue}{\rule{7pt}{2pt}}~%
-     Sparsity ratio: $k/K=50\%$ per token\\[1pt]
-   Capacity factor: $\alpha=1.25$\\[1pt]
-   $D=d_v=d_t=768$\\[1pt]
-   $|\mathcal{V}|=64{,}000$ (PhoBERT vocab)\\[1pt]
+      rounded corners=3pt,inner sep=6pt]
+  at (10.5,-5.0)
+  {\textbf{Computational Properties}\\[4pt]
+   \textcolor{sparseBlue}{\rule{8pt}{2pt}}~%
+     Sparse activation: Top-2 of $K{=}4$\\[2pt]
+   \textcolor{sparseBlue}{\rule{8pt}{2pt}}~%
+     Sparsity ratio: $k/K=50\%$ per token\\[2pt]
+   Capacity factor: $\alpha=1.25$\\[2pt]
+   $D=d_v=d_t=768$\\[2pt]
+   $|\mathcal{V}|=64{,}000$ (PhoBERT vocab)\\[2pt]
    Weight tying: $W_e$ shared in\\
-   \quad decoder embed.\ \& output proj.\\[3pt]
-   \textcolor{gradGreen}{\rule[1pt]{7pt}{1.5pt}}~%
+   \quad decoder embed.\ \& output proj.\\[4pt]
+   \textcolor{gradGreen}{\rule[1pt]{8pt}{1.5pt}}~%
      Gradients flow through\\
-   \quad fusion, MOE, decoder\\[1pt]
+   \quad fusion, MOE, decoder\\[2pt]
    \textcolor{frozenGray}{\textbf{$\times$}}~%
-     No gradient to frozen encoders\\[3pt]
-   \textit{Dense fusion:}\;$\mathcal{O}(S^2 D)$\\
+     No gradient to frozen encoders\\[4pt]
+   \textit{Dense fusion:}\;$\mathcal{O}(S^2 D)$\\[1pt]
    \textit{Sparse MOE:}\;$\mathcal{O}(S\!\cdot\!k\!\cdot\!D)$};
 
 \end{tikzpicture}
