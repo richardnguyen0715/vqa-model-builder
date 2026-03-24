@@ -1,0 +1,52 @@
+# VIVQA Dataset Configuration
+# Configuration for loading and managing the VIVQA (Vietnamese VQA) dataset
+
+vivqa_data_path:
+  base_dir: data/vivqa
+  raw_data: data/vivqa/
+  images_dir: data/vivqa/images
+  train_csv: data/vivqa/train.csv
+  test_csv: data/vivqa/test.csv
+  val_csv: null  # Not typically provided, can use subset of train
+
+vivqa_dataset_config:
+  # Image configuration
+  image_size: 224
+  image_normalization: clip  # 'clip', 'imagenet', or 'none'
+  
+  # Tokenization
+  max_question_length: 64
+  max_answer_length: 64
+  
+  # Data loading
+  batch_size: 32
+  num_workers: 4
+  pin_memory: true
+  
+  # Model input features
+  input_dimensions:
+    image_height: 224
+    image_width: 224
+    image_channels: 3
+
+# COCO Image Download Configuration
+# Configuration for downloading COCO images based on VIVQA img_ids
+
+coco_download_config:
+  # Output settings
+  output_dir: data/vivqa/images
+  
+  # Download strategy
+  max_retries: 3
+  timeout_seconds: 30
+  batch_size: 10  # Download in batches
+  
+  # Logging
+  download_log_dir: logs/data_loader/
+  
+  # Resume capability
+  skip_existing: true
+  
+  # Statistics
+  save_download_stats: true
+  stats_file: logs/data_loader/coco_download_stats.json
