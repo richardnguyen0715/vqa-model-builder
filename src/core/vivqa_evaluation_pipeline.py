@@ -219,9 +219,9 @@ class VivqaEvaluationPipeline:
                 
                 # Generate predictions
                 generated_ids = self.model.generate(
+                    pixel_values=batch['image'],
                     input_ids=batch['input_ids'],
                     attention_mask=batch['attention_mask'],
-                    images=batch['image'],
                     max_length=self.config.max_generate_length,
                     num_beams=self.config.num_beams,
                     do_sample=self.config.do_sample,
