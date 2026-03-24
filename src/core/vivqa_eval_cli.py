@@ -144,13 +144,18 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str) -> tuple:
 
 def create_config_from_args(args: argparse.Namespace) -> EvaluationConfig:
     """Create EvaluationConfig from command-line arguments."""
+    # Resolve device from 'auto' to actual device
+    device = args.device
+    if device == 'auto':
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    
     config = EvaluationConfig(
         csv_path=args.csv_path,
         images_dir=args.images_dir,
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         checkpoint_path=args.checkpoint,
-        device=args.device,
+        device=device,
         max_generate_length=args.max_length,
         num_beams=args.num_beams,
         do_sample=args.do_sample,
