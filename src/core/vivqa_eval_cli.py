@@ -60,35 +60,48 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str) -> tuple:
     
     # Load model (checkpoint should contain model state_dict and config)
     try:
-        # Try to import the model class
-        from src.modeling.meta_arch.generative_vqa_model import GenerativeVQAModel
+        # Try to import the model class and config
+        from src.modeling.meta_arch.generative_vqa_model import (
+            GenerativeVQAModel, 
+            GenerativeVQAConfig
+        )
         
         logger.info(f"Checkpoint keys: {checkpoint.keys() if isinstance(checkpoint, dict) else 'model instance'}")
         
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
             # Checkpoint is a dict with state_dict
             model_state = checkpoint['model_state_dict']
-            model_config = checkpoint.get('model_config', {})
-            logger.info(f"Model config from checkpoint: {model_config}")
+            # Note: checkpoint has 'config' key, not 'model_config'
+            checkpoint_config_dict = checkpoint.get('config', {})
+            logger.info(f"Model config from checkpoint: {checkpoint_config_dict}")
             
-            try:
-                # Try with config parameter
-                model = GenerativeVQAModel(config=model_config) if model_config else GenerativeVQAModel()
-                model.load_state_dict(model_state)
-                logger.info("Loading from checkpoint with model state dict")
-            except TypeError as e:
-                # If config parameter fails, try without it
-                logger.warning(f"Loading with config failed: {e}. Trying alternative loading...")
-                model = GenerativeVQAModel()
-                model.load_state_dict(model_state)
-                logger.info("Loading from state dict successfully")
+            # Always create a GenerativeVQAConfig instance
+            if checkpoint_config_dict:
+                # Config exists in checkpoint, use it (convert dict to dataclass if needed)
+                if isinstance(checkpoint_config_dict, dict):
+                    logger.info("Loading config from checkpoint dict")
+                    model_config = GenerativeVQAConfig(**checkpoint_config_dict)
+                else:
+                    model_config = checkpoint_config_dict
+                logger.info("Model config loaded from checkpoint")
+            else:
+                # No config in checkpoint, use defaults
+                logger.warning("Empty config in checkpoint, using default GenerativeVQAConfig")
+                model_config = GenerativeVQAConfig()
+            
+            # Initialize model with config (this is always required)
+            model = GenerativeVQAModel(config=model_config)
+            model.load_state_dict(model_state)
+            logger.info("Model initialized and state dict loaded successfully")
         else:
             # Checkpoint is model instance or full state dict
             if isinstance(checkpoint, dict):
                 logger.info(f"Loading from full state dict (keys: {list(checkpoint.keys())[:5]}...)")
-                model = GenerativeVQAModel()
+                # Still need config - use defaults
+                model_config = GenerativeVQAConfig()
+                model = GenerativeVQAModel(config=model_config)
                 model.load_state_dict(checkpoint)
-                logger.info("Loading from state dict")
+                logger.info("Loading from state dict successfully")
             else:
                 logger.info("Loading model instance directly")
                 model = checkpoint
