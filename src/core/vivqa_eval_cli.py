@@ -63,23 +63,35 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str) -> tuple:
         # Try to import the model class
         from src.modeling.meta_arch.generative_vqa_model import GenerativeVQAModel
         
+        logger.info(f"Checkpoint keys: {checkpoint.keys() if isinstance(checkpoint, dict) else 'model instance'}")
+        
         if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
             # Checkpoint is a dict with state_dict
             model_state = checkpoint['model_state_dict']
             model_config = checkpoint.get('model_config', {})
-            logger.info("Loading from checkpoint with model state dict")
+            logger.info(f"Model config from checkpoint: {model_config}")
             
-            model = GenerativeVQAModel(**model_config)
-            model.load_state_dict(model_state)
+            try:
+                # Try with config parameter
+                model = GenerativeVQAModel(config=model_config) if model_config else GenerativeVQAModel()
+                model.load_state_dict(model_state)
+                logger.info("Loading from checkpoint with model state dict")
+            except TypeError as e:
+                # If config parameter fails, try without it
+                logger.warning(f"Loading with config failed: {e}. Trying alternative loading...")
+                model = GenerativeVQAModel()
+                model.load_state_dict(model_state)
+                logger.info("Loading from state dict successfully")
         else:
             # Checkpoint is model instance or full state dict
             if isinstance(checkpoint, dict):
+                logger.info(f"Loading from full state dict (keys: {list(checkpoint.keys())[:5]}...)")
                 model = GenerativeVQAModel()
                 model.load_state_dict(checkpoint)
                 logger.info("Loading from state dict")
             else:
-                model = checkpoint
                 logger.info("Loading model instance directly")
+                model = checkpoint
         
         model.to(device)
         logger.info("Model loaded successfully")
@@ -89,6 +101,7 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str) -> tuple:
         raise
     except Exception as e:
         logger.error(f"Failed to load model: {e}")
+        logger.error(f"Checkpoint structure: {type(checkpoint)}, keys: {checkpoint.keys() if isinstance(checkpoint, dict) else 'N/A'}")
         raise
     
     # Load tokenizer
