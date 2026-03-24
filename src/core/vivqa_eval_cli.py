@@ -50,7 +50,9 @@ def load_model_from_checkpoint(checkpoint_path: str, device: str) -> tuple:
     
     # Load checkpoint
     try:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        # Use weights_only=False for PyTorch 2.6+ compatibility
+        # This checkpoint is from the project, so it's trusted
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         logger.info(f"Checkpoint loaded successfully")
     except Exception as e:
         logger.error(f"Failed to load checkpoint: {e}")
@@ -145,19 +147,19 @@ def main():
         epilog="""
 Examples:
   # Basic evaluation
-  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/model.pt
+  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/RichardNguyen_ViMoE-VQA/best_generative_model.pt
   
   # Custom batch size and output
-  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/model.pt --batch-size 64 --output-dir results/eval/
+  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/RichardNguyen_ViMoE-VQA/best_generative_model.pt --batch-size 64 --output-dir results/eval/
   
   # Generation with beam search
-  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/model.pt --num-beams 3
+  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/RichardNguyen_ViMoE-VQA/best_generative_model.pt --num-beams 3
   
   # With sampling
-  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/model.pt --do-sample --temperature 0.7 --top-p 0.9
+  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/RichardNguyen_ViMoE-VQA/best_generative_model.pt --do-sample --temperature 0.7 --top-p 0.9
   
   # CPU evaluation
-  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/model.pt --device cpu
+  python -m src.core.vivqa_eval_cli --checkpoint checkpoints/RichardNguyen_ViMoE-VQA/best_generative_model.pt --device cpu
         """
     )
     
