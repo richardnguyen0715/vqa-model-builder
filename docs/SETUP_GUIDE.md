@@ -381,6 +381,29 @@ source .venv/bin/activate
 pip install -r requirements.txt  # If available
 ```
 
+### PyTorch 2.6+ Checkpoint Loading Error
+
+```
+_pickle.UnpicklingError: Weights only load failed...
+WeightsUnpickler error: Unsupported global: GLOBAL numpy._core.multiarray.scalar
+```
+
+**Solution:**
+This is a PyTorch 2.6+ security feature. The issue has been fixed in the current version of the code.
+
+Make sure you have the latest version:
+```bash
+cd vqa-model-builder
+git pull origin main
+```
+
+If you still encounter it, update PyTorch:
+```bash
+pip install --upgrade torch
+```
+
+See [PyTorch 2.6 Compatibility Guide](docs/PYTORCH26_COMPATIBILITY.md) for more details.
+
 ### Slow Downloads
 
 - Check internet connection: `speedtest-cli`
