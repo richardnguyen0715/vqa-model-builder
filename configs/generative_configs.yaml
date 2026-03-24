@@ -29,7 +29,7 @@ model:
 # Mixture of Experts Configuration (Optional)
 moe:
   enabled: true
-  type: standard  # 'standard' (FeedForward experts - lighter), 'vqa' (specialized - heavier)
+  type: vqa  # 'standard' (FeedForward experts - lighter), 'vqa' (specialized - heavier)
   position: fusion  # 'fusion', 'decoder', 'both'
   num_experts: 8  # for standard MOE - uses FeedForwardExpert which is much lighter
   capacity_factor: 1.25

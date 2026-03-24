@@ -1,24 +1,25 @@
 # VIVQA Evaluation Configuration
 # Configuration for running inference and evaluation on VIVQA dataset
+# Aligned with generative_configs.yaml but optimized for evaluation
 
 vivqa_evaluation_config:
-  # Data configuration
+  # Data configuration (matching generative_configs)
   csv_path: data/vivqa/test.csv
   images_dir: data/vivqa/images
-  batch_size: 32
+  batch_size: 16  # Increased from 8 for evaluation speed (compatible with most GPUs)
   num_workers: 4
   
   # Model configuration
   checkpoint_path: ""  # Will be set via CLI or environment
   device: auto  # 'cuda', 'cpu', or 'auto'
   
-  # Generation configuration
+  # Generation configuration (from generative_configs)
   generation:
     max_length: 64
-    num_beams: 1
-    do_sample: false
-    temperature: 1.0
-    top_p: 0.9
+    num_beams: 1              # Match training validation (num_beams=1 greedy)
+    do_sample: false          # Conservative: use deterministic decoding
+    temperature: 1.0          # Not used with do_sample=false
+    top_p: 0.95
     top_k: 50
     early_stopping: true
     
@@ -53,8 +54,8 @@ vivqa_evaluation_config:
     num_samples_to_display: 10
     log_level: INFO
     
-  # Performance
+  # Performance (matching generative_configs)
   performance:
     pin_memory: true
-    mixed_precision: false
+    mixed_precision: false    # Set to false for stability
     gradient_checkpointing: false
