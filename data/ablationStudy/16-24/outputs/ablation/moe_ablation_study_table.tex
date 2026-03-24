@@ -1,0 +1,20 @@
+\begin{table}[h]
+\centering
+\caption{Ablation Study Results for MOE Configurations}
+\label{tab:ablation}
+\begin{tabular}{lcccccc}
+\toprule
+Experiment & Bleu & Meteor & Rouge L & Cider & Exact Match & F1 \\
+\midrule
+full/topk\_k4 & \textbf{6.45} & \textbf{28.23} & 41.99 & \textbf{69.08} & 6.23 & \textbf{45.85} \\
+full/topk\_k2 & 6.39 & 28.02 & 41.78 & 68.93 & 6.63 & 45.60 \\
+subset\_multimodal\_specialized/noisy\_topk\_k2 & 6.12 & 28.04 & 41.98 & 67.37 & \textbf{6.85} & 45.58 \\
+subset\_multimodal\_specialized\_text/noisy\_topk\_k2 & 6.12 & 28.07 & \textbf{42.02} & 67.42 & \textbf{6.85} & 45.59 \\
+subset\_multimodal\_text/noisy\_topk\_k2 & 4.99 & 26.09 & 40.30 & 61.92 & 6.36 & 43.78 \\
+subset\_multimodal\_text\_vision/noisy\_topk\_k2 & 4.72 & 25.98 & 40.39 & 60.43 & 6.15 & 43.99 \\
+subset\_multimodal\_vision/noisy\_topk\_k2 & 4.72 & 25.98 & 40.39 & 60.43 & 6.15 & 43.99 \\
+subset\_multimodal\_specialized\_vision/noisy\_topk\_k2 & 4.67 & 25.72 & 40.32 & 60.05 & 6.26 & 43.54 \\
+subset\_specialized\_vision/noisy\_topk\_k2 & 4.65 & 25.94 & 40.29 & 61.08 & 6.36 & 43.68 \\
+\bottomrule
+\end{tabular}
+\end{table}

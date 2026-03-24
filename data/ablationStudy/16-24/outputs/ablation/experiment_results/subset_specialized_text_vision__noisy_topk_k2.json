@@ -1,0 +1,52 @@
+{
+  "experiment_id": "subset_specialized_text_vision__noisy_topk_k2",
+  "experiment_config": {
+    "experiment_id": "subset_specialized_text_vision__noisy_topk_k2",
+    "expert_config": {
+      "mode": "subset",
+      "active_experts": [
+        "specialized",
+        "text",
+        "vision"
+      ],
+      "disabled_experts": [
+        "multimodal"
+      ],
+      "num_experts_per_type": {
+        "vision": 2,
+        "text": 2,
+        "multimodal": 0,
+        "specialized": 2
+      },
+      "description": "Subset: specialized+text+vision"
+    },
+    "router_config": {
+      "router_type": "noisy_topk",
+      "top_k": 2,
+      "noise_enabled": true,
+      "load_balance_weight": 0.01,
+      "capacity_factor": 1.25,
+      "description": "Router=noisy_topk | K=2 | noise=on | lb=0.01"
+    },
+    "num_epochs": 10,
+    "learning_rate": 2e-05,
+    "batch_size": 32,
+    "seed": 42,
+    "tags": [
+      "subset",
+      "router_noisy_topk"
+    ],
+    "priority": 5
+  },
+  "metrics": {},
+  "moe_metrics": {},
+  "training_history": [],
+  "validation_history": [],
+  "total_epochs": 0,
+  "training_time": 1577.9205372333527,
+  "best_metric": 0.0,
+  "checkpoint_path": "",
+  "status": "failed",
+  "error_message": "RuntimeError: [enforce fail at inline_container.cc:664] . unexpected pos 3359491904 vs 3359491792\nTraceback (most recent call last):\n  File \"/venv/train/lib/python3.11/site-packages/torch/serialization.py\", line 967, in save\n    _save(\n  File \"/venv/train/lib/python3.11/site-packages/torch/serialization.py\", line 1268, in _save\n    zip_file.write_record(name, storage, num_bytes)\nRuntimeError: [enforce fail at inline_container.cc:858] . PytorchStreamWriter failed writing file data/781: file write failed\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/workspace/vqa-model-builder/src/ablation/ablation_trainer.py\", line 690, in run_experiment\n    output = pipeline.run()\n             ^^^^^^^^^^^^^^\n  File \"/workspace/vqa-model-builder/src/core/generative_training_pipeline.py\", line 155, in run\n    self._training_loop()\n  File \"/workspace/vqa-model-builder/src/core/generative_training_pipeline.py\", line 274, in _training_loop\n    self._save_checkpoint(is_best, val_metrics)\n  File \"/workspace/vqa-model-builder/src/core/generative_training_pipeline.py\", line 596, in _save_checkpoint\n    torch.save(checkpoint, best_path)\n  File \"/venv/train/lib/python3.11/site-packages/torch/serialization.py\", line 966, in save\n    with _open_zipfile_writer(f) as opened_zipfile:\n  File \"/venv/train/lib/python3.11/site-packages/torch/serialization.py\", line 798, in __exit__\n    self.file_like.write_end_of_file()\nRuntimeError: [enforce fail at inline_container.cc:664] . unexpected pos 3359491904 vs 3359491792\n",
+  "device_used": ""
+}

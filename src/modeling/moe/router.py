@@ -462,11 +462,16 @@ def create_router(
         router_type: Type of router (topk, soft, noisy_topk, expert_choice)
         input_dim: Input feature dimension
         num_experts: Number of experts
-        **kwargs: Additional router-specific arguments
+        **kwargs: Additional router-specific arguments.
+            Only kwargs accepted by the chosen router class are forwarded;
+            unrecognised keys are silently ignored so callers can pass a
+            superset of parameters.
         
     Returns:
         Router instance
     """
+    import inspect
+
     routers = {
         'topk': TopKRouter,
         'soft': SoftRouter,
@@ -477,4 +482,13 @@ def create_router(
     if router_type not in routers:
         raise ValueError(f"Unknown router type: {router_type}. Available: {list(routers.keys())}")
     
-    return routers[router_type](input_dim, num_experts, **kwargs)
+    router_cls = routers[router_type]
+
+    # Filter kwargs to only include parameters the router class actually accepts.
+    # This prevents TypeErrors when callers pass a superset of kwargs
+    # (e.g. noise_std for TopKRouter, or top_k for ExpertChoiceRouter).
+    sig = inspect.signature(router_cls.__init__)
+    valid_params = set(sig.parameters.keys()) - {'self'}
+    filtered_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
+
+    return router_cls(input_dim, num_experts, **filtered_kwargs)

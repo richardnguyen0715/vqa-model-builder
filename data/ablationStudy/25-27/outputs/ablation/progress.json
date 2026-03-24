@@ -1,0 +1,15 @@
+{
+  "current_index": 27,
+  "total_experiments": 27,
+  "completed": 3,
+  "failed": 0,
+  "last_updated": "2026-02-25T20:50:46.874833",
+  "completed_ids": [
+    "subset_specialized_text_vision__noisy_topk_k2",
+    "subset_text_vision__noisy_topk_k2",
+    "subset_specialized_vision__noisy_topk_k2",
+    "subset_specialized_text_vision__noisy_topk_k2",
+    "subset_specialized_vision__noisy_topk_k2",
+    "subset_text_vision__noisy_topk_k2"
+  ]
+}

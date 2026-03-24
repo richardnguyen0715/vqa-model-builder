@@ -401,20 +401,30 @@ class TransformerDecoder(nn.Module):
         decoder_embeds = self.embedding(decoder_input_ids)
         decoder_embeds = self.pos_encoding(decoder_embeds)
         
-        # Create causal mask for decoder self-attention
+        # Create causal mask for decoder self-attention (float: 0 / -inf)
         seq_len = decoder_input_ids.size(1)
         causal_mask = self._generate_causal_mask(seq_len, decoder_input_ids.device)
         
-        # Create padding mask for encoder
+        # Create padding masks as float tensors to match causal_mask dtype,
+        # avoiding PyTorch warning about mismatched mask types.
+        # Convention: 0.0 = attend, -inf = ignore
         if encoder_attention_mask is not None:
-            # Invert: 1 = attend -> False, 0 = pad -> True
-            memory_key_padding_mask = ~encoder_attention_mask.bool()
+            memory_key_padding_mask = encoder_attention_mask.float()
+            memory_key_padding_mask = memory_key_padding_mask.masked_fill(
+                memory_key_padding_mask == 0, float('-inf')
+            ).masked_fill(
+                memory_key_padding_mask == 1, 0.0
+            )
         else:
             memory_key_padding_mask = None
         
-        # Create padding mask for decoder
         if decoder_attention_mask is not None:
-            tgt_key_padding_mask = ~decoder_attention_mask.bool()
+            tgt_key_padding_mask = decoder_attention_mask.float()
+            tgt_key_padding_mask = tgt_key_padding_mask.masked_fill(
+                tgt_key_padding_mask == 0, float('-inf')
+            ).masked_fill(
+                tgt_key_padding_mask == 1, 0.0
+            )
         else:
             tgt_key_padding_mask = None
         

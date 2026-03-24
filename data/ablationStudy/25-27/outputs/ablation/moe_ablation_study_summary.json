@@ -1,0 +1,29 @@
+{
+  "study_name": "moe_ablation_study",
+  "total_experiments": 27,
+  "completed": 3,
+  "failed": 0,
+  "skipped": 0,
+  "total_time_seconds": 10397.788863658905,
+  "total_time_human": "2h 53m",
+  "key_findings": [
+    "Expert importance ranking (LOO drops): vision (+0.00%), text (+0.00%), multimodal (+0.00%), specialized (+0.00%)",
+    "Most important expert: vision (removing it drops bleu by 0.00%)",
+    "Least important expert: specialized (removing it changes bleu by only 0.00%)",
+    "Strongest synergy: vision + text (synergy = +6.45% over best solo)",
+    "Best overall experiment: subset_specialized_text_vision__noisy_topk_k2 (bleu = 6.56%)"
+  ],
+  "report_paths": {
+    "markdown": "outputs/ablation/moe_ablation_study_report.md",
+    "csv_results": "outputs/ablation/ablation_results.csv",
+    "csv_contributions": "outputs/ablation/expert_contributions.csv",
+    "latex": "outputs/ablation/moe_ablation_study_table.tex",
+    "json_analysis": "outputs/ablation/moe_ablation_study_analysis.json",
+    "json_raw": "outputs/ablation/moe_ablation_study_raw_results.json"
+  },
+  "best_experiment": {
+    "experiment_id": "subset_specialized_text_vision__noisy_topk_k2",
+    "bleu": 0.06564177840149207,
+    "checkpoint_path": "checkpoints/ablation/subset_specialized_text_vision__noisy_topk_k2/best_generative_model.pt"
+  }
+}

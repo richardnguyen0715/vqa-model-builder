@@ -1,0 +1,197 @@
+
+\section{Proposed Method}
+\label{sec:method}
+
+This section presents the proposed generative Vietnamese Visual Question Answering (VQA) framework, comprising a visual encoder, a Vietnamese-specific text encoder, a Mixture-of-Experts (MOE) multimodal fusion module with heterogeneous specialized experts and sparse routing, and an autoregressive transformer decoder.
+
+%% =============================================
+\subsection{Overall Architecture}
+\label{sec:method:overview}
+
+Given an input image $I$ and a Vietnamese question $Q$, we formulate VQA as conditional sequence generation. The model learns:
+\begin{equation}
+    P(A \mid I, Q) = \prod_{t=1}^{T} P(a_t \mid a_{<t}, I, Q),
+    \label{eq:conditional_gen}
+\end{equation}
+
+\begin{figure}[t]
+\centering
+\includegraphics[
+    width=0.9\linewidth,
+    trim=0 520 0 0,
+    clip
+]{figures/architecture.pdf}
+\caption{Overall architecture of the proposed framework.}
+\label{fig:architecture}
+\end{figure}
+
+where $A = \{a_1, \ldots, a_T\}$ denotes the answer tokens. Our framework (Figure~\ref{fig:architecture}) consists of four components: (1)~a visual encoder based on CLIP ViT-B/32~\cite{radford2021learning}, (2)~a text encoder based on PhoBERT-base~\cite{nguyen2020phobert}, (3)~an MOE-based multimodal fusion module with heterogeneous experts and sparse Top-$k$ routing, and (4)~an autoregressive transformer decoder.
+
+
+
+
+%% =============================================
+\subsection{Visual Encoder}
+\label{sec:method:visual}
+
+We employ the Vision Transformer (ViT-B/32) from CLIP~\cite{radford2021learning} as the visual backbone. Given an input image $I$, the encoder extracts patch-level visual embeddings:
+\begin{equation}
+    V = \text{CLIP-ViT}(I) = \{v_{\texttt{[CLS]}}, v_1, \ldots, v_N\}, \quad v_i \in \mathbb{R}^{d_v},
+    \label{eq:visual_enc}
+\end{equation}
+where $N$ is the number of image patches and $d_v$ is the hidden dimension. The CLIP encoder benefits from large-scale contrastive vision-language pretraining, providing semantically rich representations. When $d_v$ differs from the fusion dimension $d$, a learnable projection $W_v \in \mathbb{R}^{d_v \times d}$ maps the features to a shared multimodal space. The visual backbone can be either frozen or fine-tuned.
+
+%% =============================================
+\subsection{Text Encoder}
+\label{sec:method:text}
+
+For Vietnamese textual representation, we adopt PhoBERT-base~\cite{nguyen2020phobert}, a RoBERTa-based~\cite{liu2019roberta} model pretrained on a large-scale Vietnamese corpus with word-level segmentation. Given a tokenized question $Q = \{q_1, \ldots, q_M\}$ with attention mask $\mathbf{m} \in \{0,1\}^M$, the encoder produces:
+\begin{equation}
+    T = \text{PhoBERT}(Q) = \{t_1, \ldots, t_M\}, \quad t_j \in \mathbb{R}^{d_t},
+    \label{eq:text_enc}
+\end{equation}
+with an analogous projection $W_t$ when $d_t \neq d$. Using a language-specific encoder enables the model to capture tonal distinctions, compound word formation, and context-dependent semantics characteristic of Vietnamese.
+
+%% =============================================
+\subsection{Cross-Modal Fusion with Mixture-of-Experts}
+\label{sec:method:fusion}
+
+We introduce a Mixture-of-Experts (MOE) multimodal fusion module that first performs attention-based feature integration, then routes fused representations through heterogeneous specialized experts, enabling the model to dynamically select reasoning strategies depending on the question type and visual content.
+
+\subsubsection{Attention-Based Feature Integration}
+\label{sec:method:fusion:attention}
+
+The projected visual tokens $\hat{V}$ and question tokens $\hat{T}$ are concatenated to form a unified multimodal sequence:
+\begin{equation}
+    X^{(0)} = [\hat{V}; \hat{T}] \in \mathbb{R}^{(N+1+M) \times d}.
+    \label{eq:concat_features}
+\end{equation}
+This sequence is processed through $L_f$ pre-norm transformer encoder layers~\cite{ba2016layer} with GELU activation~\cite{hendrycks2016gaussian}, each consisting of multi-head self-attention (MHSA) and a feed-forward network (FFN):
+\begin{align}
+    X'^{(l)} &= X^{(l-1)} + \text{MHSA}\!\left(\text{LN}(X^{(l-1)})\right), \\
+    X^{(l)}  &= X'^{(l)} + \text{FFN}\!\left(\text{LN}(X'^{(l)})\right),
+\end{align}
+for $l = 1, \ldots, L_f$. The attention mask ensures that visual tokens are always attended while padding tokens in the question are appropriately masked.
+
+\subsubsection{Sparse Expert Routing}
+\label{sec:method:fusion:routing}
+
+The fused representations are passed through the MOE layer, where a routing mechanism assigns each token to a sparse subset of experts. We adopt a Noisy Top-$k$ Router as the default. Given a token $x \in \mathbb{R}^d$, the gating network computes routing logits via a learnable matrix $W_r \in \mathbb{R}^{d \times K}$:
+\begin{equation}
+    \ell = W_r^\top x, \quad p = \text{Softmax}(\ell),
+    \label{eq:routing}
+\end{equation}
+where $K$ is the total number of experts. Only the Top-$k$ experts with the highest scores are activated, and their weights are renormalized:
+\begin{equation}
+    g_i = 
+    \begin{cases}
+        p_i \big/ {\textstyle\sum_{j \in \text{Top-}k(p)} p_j}, & \text{if } i \in \text{Top-}k(p), \\
+        0, & \text{otherwise}.
+    \end{cases}
+    \label{eq:topk_gate}
+\end{equation}
+
+To encourage exploration and prevent premature expert collapse, input-dependent learned noise~\cite{shazeer2017outrageously} is added during training:
+\begin{equation}
+    \tilde{\ell} = W_r^\top x + \text{Softplus}(W_n^\top x) \cdot \epsilon, \quad \epsilon \sim \mathcal{N}(0, \sigma^2 I),
+    \label{eq:noisy_routing}
+\end{equation}
+where $W_n \in \mathbb{R}^{d \times K}$ is a learnable noise scale matrix. Noise is disabled during inference. We additionally support Expert Choice routing~\cite{zhou2022mixture}, where experts select tokens (ensuring perfect load balance), and dense Soft routing for ablation purposes.
+
+\subsubsection{Heterogeneous Specialized Experts}
+\label{sec:method:fusion:experts}
+
+A key contribution of our framework is the use of \textit{heterogeneous} specialized experts designed for distinct VQA reasoning sub-tasks, in contrast to standard MOE architectures that employ homogeneous feed-forward networks. Our VQA-specific MOE layer composes a diverse expert pool drawn from the following categories:
+
+\paragraph{Vision Expert ($E_{\text{vis}}$)}
+Processes visual features with spatial awareness through a multi-head spatial self-attention mechanism, enabling modeling of inter-patch relationships and spatial structure:
+\begin{align}
+    h' &= \text{LN}\!\left(h + \text{MHSA}(h, h, h)\right), \\
+    E_{\text{vis}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(h' + \text{FFN}(h')\right)\right).
+\end{align}
+
+\paragraph{Text Expert ($E_{\text{txt}}$)}
+Specializes in linguistic processing with contextual self-attention and a position-wise FFN, using the question mask to handle padding:
+\begin{align}
+    h' &= \text{LN}\!\left(h + \text{MHSA}(h, h, h; \text{mask})\right), \\
+    E_{\text{txt}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(\text{LN}(h' + \text{FFN}(h'))\right)\right).
+\end{align}
+
+\paragraph{Multimodal Expert ($E_{\text{mm}}$)}
+Performs cross-modal reasoning via cross-attention with a learned modality gate $\gamma$ that adaptively controls the contribution of cross-modal information:
+\begin{align}
+    h_{\text{cross}} &= \text{CrossAttn}(h, h_c, h_c), \\
+    \gamma &= \sigma\!\left(W_g [h; h_{\text{cross}}]\right), \label{eq:modality_gate} \\
+    E_{\text{mm}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(\text{LN}(h + \gamma \odot h_{\text{cross}}) + \text{FFN}(\cdot)\right)\right),
+\end{align}
+where $\gamma \in (0,1)^d$ is a sigmoid-gated vector and $h_c$ represents context from the other modality.
+
+\paragraph{Segmentation Expert ($E_{\text{seg}}$)}
+Inspired by SAM~\cite{kirillov2023segment}, this expert understands object boundaries and spatial relationships via learnable mask tokens attended through a transformer decoder, combined with a convolutional boundary feature extractor and a spatial relationship MLP:
+\begin{align}
+    M &= \text{TransDec}(\mathbf{m}_{\text{learnable}}, h), \quad B = \text{BoundaryConv}(h), \\
+    E_{\text{seg}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(h + B + \text{SpatialMLP}([B; \text{Pool}(M)])\right)\right).
+\end{align}
+
+\paragraph{Object Detection Expert ($E_{\text{det}}$)}
+Inspired by DETR~\cite{carion2020end}, this expert identifies and localizes objects using learnable object queries processed by a transformer decoder. Input features are enhanced via cross-attention to the resulting object-level representations:
+\begin{align}
+    O &= \text{FFN}\!\left(\text{TransDec}(\mathbf{q}_{\text{learnable}}, h)\right), \\
+    E_{\text{det}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(h + \text{CrossAttn}(h, O, O)\right)\right).
+\end{align}
+
+\paragraph{OCR Expert ($E_{\text{ocr}}$)}
+Detects and reads text in images using learnable text queries with a transformer decoder, a reading-order attention module, and Vietnamese-specific processing for tonal marks and diacritics:
+\begin{align}
+    R &= \text{TransDec}(\mathbf{r}_{\text{learnable}}, h), \quad R' = \text{ReadingOrderAttn}(R), \\
+    E_{\text{ocr}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(h + \text{FFN}(\text{CrossAttn}(h, R', R'))\right)\right).
+\end{align}
+
+\paragraph{Scene Understanding Expert ($E_{\text{scene}}$)}
+Captures holistic scene-level semantics through learnable scene tokens jointly encoded with input features via a transformer encoder. A global pooling branch provides a scene summary distributed back through cross-attention:
+\begin{align}
+    [S^*; H^*] &= \text{TransEnc}([\mathbf{s}_{\text{learnable}}; h]), \\
+    E_{\text{scene}}(x) &= \text{LN}\!\left(W_{\text{out}}\!\left(H^* + \text{CrossAttn}(H^*, S^*, S^*) + \text{Pool}(S^*)\right)\right).
+\end{align}
+
+\paragraph{Spatial Reasoning \& Counting Experts}
+We further include a \textit{Spatial Reasoning Expert} ($E_{\text{spatial}}$) that models pairwise spatial relationships via graph attention and learned relation embeddings, and a \textit{Counting Expert} ($E_{\text{count}}$) that estimates object density through attention-based counting queries. Both follow the same encoder--query--aggregate pattern as the experts above. These experts are activated when the router detects spatial or quantitative reasoning demands in the input.
+
+\subsubsection{Output Combination and Load Balancing}
+\label{sec:method:fusion:output}
+
+The MOE output for each token is the weighted combination of the Top-$k$ selected expert outputs, followed by layer normalization:
+\begin{equation}
+    y = \text{LN}\!\left(\sum_{i \in \text{Top-}k(g)} g_i \cdot E_i(x)\right).
+    \label{eq:moe_output}
+\end{equation}
+The sparse activation allows different question types to activate different expert combinations---e.g., counting questions may engage $E_{\text{count}}$ and $E_{\text{vis}}$, while questions about text in images may activate $E_{\text{ocr}}$ and $E_{\text{txt}}$.
+
+To prevent expert collapse, we incorporate a load-balancing loss~\cite{shazeer2017outrageously, fedus2022switch}:
+\begin{equation}
+    \mathcal{L}_{\text{lb}} = K \sum_{i=1}^{K} f_i \cdot \bar{p}_i,
+    \label{eq:load_balance}
+\end{equation}
+where $f_i$ is the fraction of tokens routed to expert $i$ and $\bar{p}_i$ is the mean routing probability for expert $i$. This encourages uniform expert utilization during training.
+
+%% =============================================
+\subsection{Generative Decoder}
+\label{sec:method:decoder}
+
+The fused multimodal representations serve as encoder memory for an autoregressive transformer decoder. Each decoder layer follows the pre-norm architecture with (1)~causal multi-head self-attention over previously generated tokens, (2)~cross-attention to the multimodal encoder output, and (3)~a position-wise FFN with GELU activation. Decoder input tokens are embedded via a shared embedding matrix $W_e \in \mathbb{R}^{|\mathcal{V}| \times d}$ and augmented with sinusoidal positional encodings~\cite{vaswani2017attention}. Weight tying~\cite{press2017using} is applied between the embedding and output projection to reduce parameters and improve generalization. During inference, we support greedy decoding and nucleus sampling~\cite{holtzman2020curious}.
+
+%% =============================================
+\subsection{Training Objective}
+\label{sec:method:training}
+
+The model is trained end-to-end with teacher forcing. The total loss combines cross-entropy with label smoothing and MOE load-balancing regularization:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_{\text{ce}} + \lambda \, \mathcal{L}_{\text{lb}},
+    \label{eq:total_loss}
+\end{equation}
+where:
+\begin{equation}
+    \mathcal{L}_{\text{ce}} = - \sum_{t=1}^{T} \left[(1 - \epsilon) \log P(a_t \mid a_{<t}, I, Q) + \frac{\epsilon}{|\mathcal{V}|} \sum_{v=1}^{|\mathcal{V}|} \log P(v \mid a_{<t}, I, Q)\right],
+    \label{eq:ce_loss}
+\end{equation}
+and $\lambda$ controls the load-balancing contribution. This generative formulation enables open-ended Vietnamese answer generation, avoiding limitations of fixed answer vocabularies.

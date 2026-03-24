@@ -1,0 +1,25 @@
+% =============================================================================
+%  Standalone Architecture Diagram — compile with:
+%    pdflatex architecture_diagram.tex
+%  or:
+%    xelatex  architecture_diagram.tex
+% =============================================================================
+\documentclass[border=12pt,tikz]{standalone}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{tikz,xcolor}
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  shapes.geometric,
+  calc,
+  fit,
+  backgrounds,
+  decorations.pathreplacing,
+  patterns
+}
+
+\begin{document}
+\input{architecture_diagram_body.tex}
+\end{document}

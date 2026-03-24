@@ -1,0 +1,19 @@
+{
+  "current_index": 15,
+  "total_experiments": 27,
+  "completed": 5,
+  "failed": 0,
+  "last_updated": "2026-02-25T01:40:52.037782",
+  "completed_ids": [
+    "full__expert_choice_k1",
+    "full__topk_k1",
+    "full__noisy_topk_k4",
+    "full__noisy_topk_k1",
+    "full__soft_k1",
+    "full__expert_choice_k1",
+    "full__noisy_topk_k1",
+    "full__noisy_topk_k4",
+    "full__soft_k1",
+    "full__topk_k1"
+  ]
+}
