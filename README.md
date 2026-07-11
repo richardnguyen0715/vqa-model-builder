@@ -1,46 +1,30 @@
-# 🇻🇳 AutoViVQA Model Builder
+# AutoViVQA Model Builder
 
 <div align="center">
-
-```
-╔══════════════════════════════════════════════════════════════════════════════════════════╗
-║                                                                                          ║
-║  ██╗   ██╗ ██████╗  █████╗     ██████╗ ██╗██████╗ ███████╗██╗     ██╗███╗   ██╗███████╗  ║
-║  ██║   ██║██╔═══██╗██╔══██╗    ██╔══██╗██║██╔══██╗██╔════╝██║     ██║████╗  ██║██╔════╝  ║
-║  ██║   ██║██║   ██║███████║    ██████╔╝██║██████╔╝█████╗  ██║     ██║██╔██╗ ██║█████╗    ║
-║  ╚██╗ ██╔╝██║▄▄ ██║██╔══██║    ██╔═══╝ ██║██╔═══╝ ██╔══╝  ██║     ██║██║╚██╗██║██╔══╝    ║
-║   ╚████╔╝ ╚██████╔╝██║  ██║    ██║     ██║██║     ███████╗███████╗██║██║ ╚████║███████╗  ║
-║    ╚═══╝   ╚══▀▀═╝ ╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝     ╚══════╝╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝  ║
-║                                                                                          ║
-║                            Vietnamese Visual Question Answering                          ║
-║                                  AutoViVQA Model Builder                                 ║
-║                                                                                          ║
-╚══════════════════════════════════════════════════════════════════════════════════════════╝
-```
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://python.org)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.9+-ee4c2c.svg)](https://pytorch.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**Hệ thống Visual Question Answering tiếng Việt toàn diện với kiến trúc tiên tiến**
+**Hệ thống Visual Question Answering tiếng Việt với kiến trúc mô-đun cho huấn luyện, đánh giá và ablation study**
 
-[Tính năng](#-tính-năng) •
-[Cài đặt](#-cài-đặt) •
-[Bắt đầu nhanh](#-bắt-đầu-nhanh) •
-[Pipeline Guide](#-pipeline-guide) •
-[Tài liệu](#-tài-liệu-chi-tiết)
+[Tính năng](#tính-năng) •
+[Cài đặt](#cài-đặt) •
+[Bắt đầu nhanh](#bắt-đầu-nhanh) •
+[Pipeline Guide](#pipeline-guide) •
+[Tài liệu](#tài-liệu-chi-tiết)
 
 </div>
 
 ---
 
-## 📋 Mục lục
+## Mục lục
 
-- [Tính năng](#-tính-năng)
-- [Kiến trúc tổng quan](#-kiến-trúc-tổng-quan)
-- [Cài đặt](#-cài-đặt)
-- [Bắt đầu nhanh](#-bắt-đầu-nhanh)
-- [Pipeline Guide](#-pipeline-guide)
+- [Tính năng](#tính-năng)
+- [Kiến trúc tổng quan](#kiến-trúc-tổng-quan)
+- [Cài đặt](#cài-đặt)
+- [Bắt đầu nhanh](#bắt-đầu-nhanh)
+- [Pipeline Guide](#pipeline-guide)
   - [1. Chuẩn bị dữ liệu (Data Processing)](#1-chuẩn-bị-dữ-liệu-data-processing)
   - [2. Huấn luyện (Training)](#2-huấn-luyện-training)
   - [3. Đánh giá (Evaluation)](#3-đánh-giá-evaluation)
@@ -60,27 +44,27 @@
 
 ---
 
-## 🌟 Tính năng
+## Tính năng
 
 | Thành phần | Chi tiết |
-|:----------:|:---------|
-| 🖼️ **Visual Encoders** | CLIP ViT-B/32, ResNet, Swin Transformer, DINOv2 |
-| 📝 **Text Encoders** | PhoBERT (tối ưu tiếng Việt), BERT, RoBERTa, BARTpho |
-| 🔗 **Multimodal Fusion** | Cross-Attention, Bilinear, MCAN, Concat, MuTAN |
-| 🧠 **Mixture of Experts** | VQA MOE Layer, 4 loại router, 6+ loại expert chuyên biệt |
-| 📚 **Knowledge Base / RAG** | FAISS vector store, dense/sparse/hybrid retriever |
-| 📊 **Metrics** | VQA Soft Accuracy, BLEU-4, METEOR, ROUGE-L, CIDEr, F1, WUPS |
-| 🔬 **Ablation Study** | Expert-level, Router-level, tự động báo cáo Markdown/CSV/LaTeX |
-| ⚡ **Training** | AMP FP16, gradient accumulation, early stopping, cosine warmup |
-| 🛡️ **Resource Management** | GPU/CPU/RAM monitoring, emergency backup, auto shutdown |
-| 🎯 **Dual Paradigm** | Classification VQA + Generative VQA (encoder-decoder) |
-| 🔄 **Graceful Interruption** | Ctrl+C → emergency checkpoint → tự động resume |
-| 📝 **Per-experiment Logging** | Log riêng biệt cho từng experiment, per-epoch CSV/JSON |
-| 📈 **Incremental Reporting** | Báo cáo tự động sau mỗi experiment hoàn thành |
+|:----------|:---------|
+| **Visual Encoders** | CLIP ViT-B/32, ResNet, Swin Transformer, DINOv2 |
+| **Text Encoders** | PhoBERT (tối ưu tiếng Việt), BERT, RoBERTa, BARTpho |
+| **Multimodal Fusion** | Cross-Attention, Bilinear, MCAN, Concat, MuTAN |
+| **Mixture of Experts** | VQA MOE Layer, 4 loại router, 6+ loại expert chuyên biệt |
+| **Knowledge Base / RAG** | FAISS vector store, dense/sparse/hybrid retriever |
+| **Metrics** | VQA Soft Accuracy, BLEU-4, METEOR, ROUGE-L, CIDEr, F1, WUPS |
+| **Ablation Study** | Expert-level, Router-level, tự động báo cáo Markdown/CSV/LaTeX |
+| **Training** | AMP FP16, gradient accumulation, early stopping, cosine warmup |
+| **Resource Management** | GPU/CPU/RAM monitoring, emergency backup, auto shutdown |
+| **Dual Paradigm** | Classification VQA + Generative VQA (encoder-decoder) |
+| **Graceful Interruption** | Ctrl+C → emergency checkpoint → tự động resume |
+| **Per-experiment Logging** | Log riêng biệt cho từng experiment, per-epoch CSV/JSON |
+| **Incremental Reporting** | Báo cáo tự động sau mỗi experiment hoàn thành |
 
 ---
 
-## 🏗 Kiến trúc tổng quan
+## Kiến trúc tổng quan
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -107,7 +91,7 @@
 
 ---
 
-## 📦 Cài đặt
+## Cài đặt
 
 ### Yêu cầu hệ thống
 
@@ -155,7 +139,7 @@ python -c "from src.core.vqa_pipeline import VQAPipeline; print('Import OK')"
 
 ---
 
-## 🚀 Bắt đầu nhanh
+## Bắt đầu nhanh
 
 ### One-Command (Dùng shell script)
 
@@ -190,7 +174,7 @@ python -m src.core.vqa_pipeline \
 
 ---
 
-## 📖 Pipeline Guide
+## Pipeline Guide
 
 ### 1. Chuẩn bị dữ liệu (Data Processing)
 
@@ -612,7 +596,7 @@ python -m src.core.generative_vqa_pipeline \
   - **OCR Expert**: Text recognition với Vietnamese optimization (nhận dạng chữ tiếng Việt)
   - **Scene Expert**: Scene understanding (hiểu ngữ cảnh cảnh)
 
-> ⚠️ **Lưu ý**: Chỉ khi dùng `--moe-type vqa` mới có các specialized experts (SAM, Detection, OCR, Scene). Với `--moe-type standard` chỉ có FeedForward experts đơn giản.
+> **Lưu ý**: Chỉ khi dùng `--moe-type vqa` mới có các specialized experts (SAM, Detection, OCR, Scene). Với `--moe-type standard` chỉ có FeedForward experts đơn giản.
 
 ##### 5.3.3 Sparse MOE
 
@@ -983,14 +967,14 @@ python -m src.ablation.run_ablation --rerun 5
 Khi nhấn **Ctrl+C** trong quá trình chạy ablation study, hệ thống sẽ dừng an toàn:
 
 ```
-╔══════════════════════════════════════════════════════════╗
-║  ⚠ INTERRUPTED — saving emergency checkpoint...         ║
-║  Emergency checkpoint saved: checkpoints/emergency/...   ║
-║  Completed: 15/27                                        ║
-║  Resume with: python -m src.ablation.run_ablation        ║
-║               --config configs/ablation_config.yaml      ║
-║               --resume                                   ║
-╚══════════════════════════════════════════════════════════╝
+======================================================================
+  INTERRUPTED — saving emergency checkpoint...
+  Emergency checkpoint saved: checkpoints/emergency/...
+  Completed: 15/27
+  Resume with: python -m src.ablation.run_ablation
+               --config configs/ablation_config.yaml
+               --resume
+======================================================================
 ```
 
 **Quy trình xử lý:**
@@ -1158,7 +1142,7 @@ reports:
 
 ---
 
-## ⚙ Cấu hình (Configuration)
+## Cấu hình (Configuration)
 
 ### File cấu hình
 
@@ -1194,7 +1178,7 @@ python -m src.core.vqa_pipeline \
 
 ---
 
-## 📁 Cấu trúc dự án
+## Cấu trúc dự án
 
 ```
 AutovivqaModelBuilder/
@@ -1296,7 +1280,7 @@ AutovivqaModelBuilder/
 
 ---
 
-## 🔧 Tổng hợp lệnh thường dùng
+## Tổng hợp lệnh thường dùng
 
 ```bash
 # ═══════════════════════════════════════════════
@@ -1348,7 +1332,7 @@ bash src/cli/run_clean.sh                                    # Clean run
 
 ---
 
-## 📚 Tài liệu chi tiết
+## Tài liệu chi tiết
 
 | Tài liệu | Mô tả |
 |-----------|--------|
@@ -1367,7 +1351,7 @@ bash src/cli/run_clean.sh                                    # Clean run
 
 ---
 
-## 📄 License
+## License
 
 MIT License — xem [LICENSE](LICENSE) để biết thêm chi tiết.
 
